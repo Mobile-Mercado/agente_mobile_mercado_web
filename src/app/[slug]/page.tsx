@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, signInAnonymously, signOut, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult, setPersistence, browserLocalPersistence, browserSessionPersistence, User } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { Send, Loader2, ShoppingCart, X, ZoomIn, QrCode, Banknote, CreditCard, Plus, Minus, Mic } from "lucide-react";
 import Image from "next/image";
 import styles from "../Agente/Agente.module.css";
@@ -325,6 +325,7 @@ const AgentePage: React.FC = () => {
   const [listaPedidoState, setListaPedidoState] = useState<ListaPedidoState | null>(null);
   const [itemUnicoQtdState, setItemUnicoQtdState] = useState<ItemUnicoQuantidadeState | null>(null);
   const [categoriaPaginadaState, setCategoriaPaginadaState] = useState<CategoriaPaginadaState | null>(null);
+  const [pendingPixOrderId, setPendingPixOrderId] = useState<string | null>(null);
 
   // --- UI
   const [mostrarCarrinho, setMostrarCarrinho]   = useState(false);
@@ -372,11 +373,39 @@ const AgentePage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
+  const pixPaidNotifiedRef = useRef<Set<string>>(new Set());
 
   // -------- Scroll automático --------
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens]);
+
+  useEffect(() => {
+    if (!pendingPixOrderId) return;
+
+    const unsub = onSnapshot(doc(db, "PurchaseRequests", pendingPixOrderId), (snap) => {
+      if (!snap.exists() || pixPaidNotifiedRef.current.has(pendingPixOrderId)) return;
+
+      const data = snap.data() as { paymentStatus?: string; orderNumber?: string; total?: number };
+      const paymentStatus = String(data.paymentStatus ?? "").toLowerCase();
+      if (paymentStatus !== "paid") return;
+
+      pixPaidNotifiedRef.current.add(pendingPixOrderId);
+      setPendingPixOrderId(null);
+      setMensagens((prev) => [
+        ...prev,
+        {
+          id: `pix-paid-${pendingPixOrderId}`,
+          role: "assistant" as const,
+          content: `✅ PIX do pedido #${data.orderNumber ?? ""} confirmado com sucesso!\n\nSeu pedido já foi recebido e seguirá para preparação.`,
+          timestamp: new Date(),
+          suggestions: ["Continuar comprando"],
+        },
+      ]);
+    });
+
+    return () => unsub();
+  }, [pendingPixOrderId]);
 
   // -------- Salva histórico de mensagens no localStorage --------
   useEffect(() => {
@@ -844,8 +873,18 @@ const AgentePage: React.FC = () => {
         const t = rawValor.toLowerCase();
         if (t.includes('pix'))                                   valor = 'Pix';
         else if (t.includes('dinheiro'))                         valor = 'Dinheiro';
-        else if (t.includes('débito') || t.includes('debito'))   valor = 'Cartão Débito';
         else if (t.includes('crédito') || t.includes('credito')) valor = 'Cartão Crédito';
+        else if (t.includes('débito') || t.includes('debito')) {
+          const msgAssistente: Mensagem = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: 'No momento aceitamos Pix, Dinheiro ou Cartão Crédito.',
+            timestamp: new Date(),
+          };
+          setMensagens((prev) => [...prev, msgAssistente]);
+          setEnviando(false);
+          return;
+        }
         wCustomerData = { ...wCustomerData, [collectingField]: valor };
         // Próximo estado condicional ao tipo de pagamento
         wFlowState = nextStateAfterPayment(valor);
@@ -2322,6 +2361,7 @@ const AgentePage: React.FC = () => {
             role:      "assistant" as const,
             content:   `✅ Pedido #${orderResult.orderNumber} confirmado!\nTotal: R$ ${orderResult.total.toFixed(2)}\n\nObrigado pela preferência! Posso ajudar com mais alguma coisa? 😊`,
             timestamp: new Date(),
+            suggestions: ["Continuar comprando"],
           }]);
         } catch (orderErr) {
           console.error("Erro ao criar pedido:", orderErr);
@@ -2400,7 +2440,6 @@ const AgentePage: React.FC = () => {
     { label: 'Pix',           shortLabel: 'Pix',     Icon: QrCode,     color: '#00897B' },
     { label: 'Dinheiro',      shortLabel: 'Dinheiro', Icon: Banknote,   color: '#388E3C' },
     { label: 'Cartão Crédito', shortLabel: 'Crédito', Icon: CreditCard, color: '#1976D2' },
-    { label: 'Cartão Débito',  shortLabel: 'Débito',  Icon: CreditCard, color: '#F57C00' },
   ];
 
   // Chips de seleção rápida por estado do fluxo
@@ -3014,7 +3053,7 @@ const AgentePage: React.FC = () => {
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className={styles.messagesEndSpacer} />
       </div>
 
       {/* Lightbox */}
@@ -3186,19 +3225,24 @@ const AgentePage: React.FC = () => {
           userDocId={userDocId}
           companyId={companyId}
           nomeCliente={nomeCliente}
-          formasPagamento={formasPagamento.length > 0 ? formasPagamento : ["Pix", "Dinheiro", "Cartão Crédito", "Cartão Débito"]}
+          formasPagamento={formasPagamento.length > 0 ? formasPagamento : ["Pix", "Dinheiro", "Cartão Crédito"]}
           subtotal={totalCarrinho}
           taxaEntrega={DELIVERY_PRICE}
           onClose={() => setShowCheckout(false)}
-          onSuccess={(orderNumber, total) => {
+          onSuccess={(orderNumber, total, pixCopyPasteKey, orderId) => {
             setShowCheckout(false);
             setCarrinho([]);
+            if (pixCopyPasteKey && orderId) setPendingPixOrderId(orderId);
             if (userDocId) limparCarrinhoFirestore(companyId, userDocId).catch(console.error);
+            const pixMessage = pixCopyPasteKey
+              ? `\n\nPIX copia e cola:\n${pixCopyPasteKey}`
+              : "";
             setMensagens((prev) => [...prev, {
               id:        `pedido-modal-${Date.now()}`,
               role:      "assistant" as const,
-              content:   `✅ Pedido #${orderNumber} confirmado!\nTotal: R$ ${total.toFixed(2).replace('.', ',')}\n\nObrigado pela preferência! Posso ajudar com mais alguma coisa? 😊`,
+              content:   `✅ Pedido #${orderNumber} confirmado!\nTotal: R$ ${total.toFixed(2).replace('.', ',')}${pixMessage}\n\nObrigado pela preferência! Posso ajudar com mais alguma coisa? 😊`,
               timestamp: new Date(),
+              suggestions: ["Continuar comprando"],
             }]);
           }}
         />

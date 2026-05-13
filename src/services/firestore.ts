@@ -112,7 +112,9 @@ export async function buscarFormasPagamento(companyId: string): Promise<string[]
   const data = snap.data() as Record<string, unknown>;
   const methods = data.paymentMethods as { name?: string }[] | undefined;
   if (!Array.isArray(methods)) return [];
-  return methods.map((m) => m.name ?? '').filter(Boolean);
+  return methods
+    .map((m) => m.name ?? '')
+    .filter((name) => name && !name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('debito'));
 }
 
 // ── CONFIG DA LOJA ──────────────────────────────────────────

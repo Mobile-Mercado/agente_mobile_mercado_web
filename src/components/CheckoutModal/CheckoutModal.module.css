@@ -522,6 +522,77 @@
 .successOrder  { font-size: 0.9rem; color: #6b7280; margin: 0; }
 .successTotal  { font-size: 1rem; color: #374151; margin: 0; }
 
+.pixSuccessCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #f9fafb;
+  text-align: left;
+}
+
+.pixSuccessTitle {
+  margin: 0;
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pixSuccessText {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.pixQrCode {
+  width: 180px;
+  height: 180px;
+  margin: 2px auto;
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.pixCopyTextarea {
+  width: 100%;
+  min-height: 74px;
+  resize: none;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  outline: none;
+}
+
+.pixCopyButton {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 12px;
+  background: #111827;
+  color: #fff;
+  padding: 11px 14px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pixCopyButton:hover { background: #1f2937; }
+
 .successBtn {
   background: #16a34a;
   color: #fff;

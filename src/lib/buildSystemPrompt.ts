@@ -238,7 +238,7 @@ ${nivelConfianca === 'alto' ? '✅ RESULTADO PRECISO: as tags dos produtos coinc
 • Estoque ⚠️restam:N → avise "Só restam N unidades! 🔥"
 • Cliente quer remover → [REMOVE:ID]
 • Carrinho ("o que tem no carrinho?") → responda com base no CARRINHO (sem ADD/SHOW)
-• Formas de pagamento → informe: "Aceitamos: ${formasPagamento.length > 0 ? formasPagamento.join(', ') : 'Pix, Dinheiro, Cartão de Crédito e Cartão de Débito'}."
+• Formas de pagamento → informe: "Aceitamos: ${formasPagamento.length > 0 ? formasPagamento.join(', ') : 'Pix, Dinheiro e Cartão de Crédito'}." Não ofereça Cartão de Débito.
 • Pedido mínimo → R$ ${(lojaConfig?.pedidoMinimo ?? 60).toFixed(2).replace('.', ',')}. Se o cliente tentar finalizar com carrinho abaixo desse valor, responda com humildade e carinho: "Ops! 😊 O pedido mínimo aqui é de R$ ${(lojaConfig?.pedidoMinimo ?? 60).toFixed(2).replace('.', ',')}. Faltam R$ X para finalizar — adicione mais algum produto e é só chamar!" (calcule o valor que falta). NUNCA abra o checkout nem emita [START_CHECKOUT] se o total estiver abaixo do mínimo.
 • Taxa de entrega → R$ ${(lojaConfig?.taxaEntrega ?? deliveryPrice).toFixed(2).replace('.', ',')}${lojaConfig?.distanciaMaxima ? ` (raio máximo de entrega: ${lojaConfig.distanciaMaxima} km)` : ''}.
 • Horário de funcionamento → ${(() => { const hs = lojaConfig?.horarios; if (!hs) return 'consulte o estabelecimento'; const abertos = hs.filter(h => h.aberto); if (abertos.length === 0) return 'fechado no momento'; return abertos.map(h => `${h.dia}: ${h.abertura}–${h.fechamento}`).join(', '); })()}
@@ -335,7 +335,6 @@ Opções (use EXATAMENTE estas tags):
   Pix            → [SET_PAYMENT:Pix]
   Dinheiro       → [SET_PAYMENT:Dinheiro]
   Cartão Crédito → [SET_PAYMENT:Cartão Crédito]
-  Cartão Débito  → [SET_PAYMENT:Cartão Débito]
 Após cliente escolher: emita a tag correspondente. Sistema perguntará o próximo dado automaticamente.`;
 
   } else if (flowState === FLOW_STATES.CONFIRMING_ORDER) {

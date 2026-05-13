@@ -4,6 +4,9 @@ import styles from "./CardPaymentForm.module.css";
 
 interface CardPaymentFormProps {
   onCardDataChange?: (cardData: CardData) => void;
+  initialCardData?: SavedCardData | null;
+  saveCard?: boolean;
+  onSaveCardChange?: (save: boolean) => void;
   loading?: boolean;
   error?: string;
 }
@@ -17,22 +20,46 @@ export interface CardData {
   installments: number;
 }
 
+export type SavedCardData = Omit<CardData, "cvv">;
+
 export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
   onCardDataChange,
+  initialCardData,
+  saveCard = false,
+  onSaveCardChange,
   loading = false,
   error,
 }) => {
   const [cardData, setCardData] = useState<CardData>({
-    cardNumber: "",
-    cardholderName: "",
-    expirationMonth: 1,
-    expirationYear: new Date().getFullYear(),
+    cardNumber: initialCardData?.cardNumber ?? "",
+    cardholderName: initialCardData?.cardholderName ?? "",
+    expirationMonth: initialCardData?.expirationMonth ?? 1,
+    expirationYear: initialCardData?.expirationYear ?? new Date().getFullYear(),
     cvv: "",
-    installments: 1,
+    installments: initialCardData?.installments ?? 1,
   });
 
   const [showCVV, setShowCVV] = useState(false);
-  const [expiryInput, setExpiryInput] = useState("");
+  const [expiryInput, setExpiryInput] = useState(
+    initialCardData
+      ? `${initialCardData.expirationMonth.toString().padStart(2, "0")}/${initialCardData.expirationYear.toString().slice(-2)}`
+      : ""
+  );
+
+  useEffect(() => {
+    if (!initialCardData) return;
+
+    const nextData: CardData = {
+      ...initialCardData,
+      cvv: "",
+    };
+
+    setCardData(nextData);
+    setExpiryInput(
+      `${initialCardData.expirationMonth.toString().padStart(2, "0")}/${initialCardData.expirationYear.toString().slice(-2)}`
+    );
+    onCardDataChange?.(nextData);
+  }, [initialCardData, onCardDataChange]);
 
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
@@ -250,10 +277,20 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
             ))}
           </select>
         </div>
+
+        <label className={styles.saveCardOption}>
+          <input
+            type="checkbox"
+            checked={saveCard}
+            onChange={(e) => onSaveCardChange?.(e.target.checked)}
+            disabled={loading}
+          />
+          <span>Salvar este cartão para a próxima compra</span>
+        </label>
       </div>
 
       <div className={styles.security}>
-        <p>🔒 Seus dados são protegidos com criptografia de segurança.</p>
+        <p>O código de segurança não será salvo. Na próxima compra, você digita apenas o CVV.</p>
       </div>
     </div>
   );

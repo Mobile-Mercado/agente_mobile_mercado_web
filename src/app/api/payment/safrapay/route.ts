@@ -264,6 +264,13 @@ export async function POST(request: NextRequest) {
         paymentMethod = "credit",
       } = body;
 
+      if (paymentMethod === "debit") {
+        return NextResponse.json(
+          { error: "Safrapay aceita apenas Cartão de Crédito e PIX neste projeto" },
+          { status: 400 }
+        );
+      }
+
       if (
         !cardNumber ||
         !cardholderName ||
@@ -287,7 +294,7 @@ export async function POST(request: NextRequest) {
           expirationMonth: parseInt(expirationMonth, 10),
           expirationYear: parseInt(expirationYear, 10),
           cvv,
-          paymentType: paymentMethod === "debit" ? SafrapayPaymentType.Debit : SafrapayPaymentType.Credit,
+          paymentType: SafrapayPaymentType.Credit,
           installments: parseInt(installments, 10),
           installmentType:
             installments > 1

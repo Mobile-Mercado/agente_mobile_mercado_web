@@ -218,6 +218,16 @@
   display: none;
 }
 
+.messagesEndSpacer {
+  flex: 0 0 48px;
+}
+
+@media (max-width: 767px) {
+  .messagesEndSpacer {
+    flex-basis: 64px;
+  }
+}
+
 /* ========================================= */
 /* 5. MENSAGENS                              */
 /* ========================================= */
@@ -1782,4 +1792,3 @@
   accent-color: #3632f8;
   flex-shrink: 0;
 }
-
