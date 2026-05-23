@@ -776,7 +776,11 @@ const AgentePage: React.FC = () => {
       { id: 'auth-validating', role: 'assistant', content: `Enviando SMS para ${authPhone}…`, timestamp: new Date() },
     ]);
     try {
-      await setPersistence(auth, authKeepLogged ? browserLocalPersistence : browserSessionPersistence);
+      try {
+        await setPersistence(auth, authKeepLogged ? browserLocalPersistence : browserSessionPersistence);
+      } catch (persistenceError) {
+        console.warn('[PhoneAuth] Nao foi possivel ajustar persistencia; continuando com o padrao.', persistenceError);
+      }
       const result = await signInWithPhoneNumber(auth, formatted, await setupRecaptchaAuth());
       setAuthConfirmation(result);
       setMensagens(prev => [

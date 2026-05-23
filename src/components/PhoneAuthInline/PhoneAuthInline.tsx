@@ -130,7 +130,11 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
     setStep("validating");
     try {
       const persistence = keepLogged ? browserLocalPersistence : browserSessionPersistence;
-      await setPersistence(auth, persistence);
+      try {
+        await setPersistence(auth, persistence);
+      } catch (persistenceError) {
+        console.warn("[PhoneAuth] Nao foi possivel ajustar persistencia; continuando com o padrao.", persistenceError);
+      }
       const verifier = await setupRecaptcha();
       const result = await signInWithPhoneNumber(auth, formatted, verifier);
       setConfirmation(result);
