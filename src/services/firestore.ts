@@ -29,6 +29,69 @@ const PAYMENT_LABELS: Record<string, string> = {
   'Pix':             'PaymentType.pix',
 };
 
+export type AgenteCaptureEventType =
+  | 'site_visit'
+  | 'entered_without_login'
+  | 'left_without_login'
+  | 'logged_in'
+  | 'cart_filled'
+  | 'cart_not_completed'
+  | 'return_visit'
+  | 'return_second_visit'
+  | 'return_tenth_visit'
+  | 'return_more_than_30_visits';
+
+export interface AgenteCaptureEvent {
+  eventId: string;
+  eventType: AgenteCaptureEventType;
+  companyId: string;
+  visitorId: string;
+  sessionId: string;
+  userDocId?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export async function registrarCapturaDadosAgente(
+  event: AgenteCaptureEvent
+): Promise<void> {
+  const res = await fetch('/api/agente/capturas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'event', event }),
+    keepalive: true,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Erro ao registrar captura: ${res.status}`);
+  }
+}
+
+export async function salvarNotaFeedbackAgente(dados: {
+  companyId: string;
+  visitorId: string;
+  sessionId: string;
+  userDocId?: string | null;
+  nota?: number | null;
+  feedback?: string;
+  conversaId?: string | null;
+}): Promise<string> {
+  const res = await fetch('/api/agente/capturas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      kind: 'feedback',
+      feedback: dados,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Erro ao salvar feedback: ${res.status}`);
+  }
+
+  const data = await res.json() as { id?: string };
+  return data.id ?? '';
+}
+
 function gerarOrderNumber(): string {
   return String(Math.floor(Math.random() * 999999 + 1)).padStart(6, '0');
 }

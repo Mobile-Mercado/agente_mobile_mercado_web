@@ -75,6 +75,7 @@ import {
 } from "@/lib/buildSystemPrompt";
 import { SLUG_PARA_COMPANY_ID, COMPANY_DATA_SOURCE, UAU_MART_COMPANY_ID } from "@/config/dominios";
 import { parseAgentResponse, COLLECTING_FIELD, NEXT_STATE, nextStateAfterPayment } from "@/lib/parseAgentResponse";
+import { runProductDiscoveryAgent, runTaskOrchestrator } from "@/lib/taskAgents";
 import {
   getProducts,
   createOrder,
@@ -95,6 +96,8 @@ import {
   DELIVERY_PRICE,
   buscarPedidosDoUsuario,
   Pedido,
+  registrarCapturaDadosAgente,
+  type AgenteCaptureEventType,
 } from "@/services/firestore";
 import { Timestamp } from "firebase/firestore";
 
@@ -222,6 +225,11 @@ const TOUR_STEPS = [
     desc: "Pode fechar o app e voltar depois — sua conversa fica salva. Use o ícone 🗑️ no topo para limpar e começar uma nova.",
   },
 ];
+
+function nomeEhPadraoDoSistema(nome: string | null | undefined): boolean {
+  const n = normalizar(String(nome ?? '')).trim();
+  return !n || n === 'cliente' || n === 'convidado';
+}
 
 // ============================================================
 // COMPONENTE PRINCIPAL
@@ -374,8 +382,146 @@ const AgentePage: React.FC = () => {
   const inputRef       = useRef<HTMLInputElement>(null);
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
   const pixPaidNotifiedRef = useRef<Set<string>>(new Set());
+  const capturaVisitorIdRef = useRef<string>('');
+  const capturaSessionIdRef = useRef<string>('');
+  const capturaUserDocIdRef = useRef<string | null>(null);
+  const capturaCartRef = useRef<CartItem[]>([]);
+  const capturaOrderCompletedRef = useRef(false);
+  const capturaEnteredWithoutLoginRef = useRef(false);
+  const capturaLoggedInRef = useRef(false);
+  const capturaCartFilledRef = useRef(false);
+  const isGuestMode = process.env.NEXT_PUBLIC_GUEST_MODE === 'true';
+
+  const registrarCaptura = React.useCallback((
+    eventType: AgenteCaptureEventType,
+    eventKey: string,
+    metadata?: Record<string, unknown>
+  ) => {
+    const visitorId = capturaVisitorIdRef.current;
+    const sessionId = capturaSessionIdRef.current;
+    if (!visitorId || !sessionId) return;
+
+    registrarCapturaDadosAgente({
+      eventId: `${companyId}:${eventKey}`,
+      eventType,
+      companyId,
+      visitorId,
+      sessionId,
+      userDocId: capturaUserDocIdRef.current,
+      metadata,
+    }).catch(console.error);
+  }, [companyId]);
 
   // -------- Scroll automático --------
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const makeId = () =>
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const visitorKey = 'agente_capturas_visitor_id';
+    let visitorId = localStorage.getItem(visitorKey);
+    if (!visitorId) {
+      visitorId = makeId();
+      localStorage.setItem(visitorKey, visitorId);
+    }
+
+    const sessionKey = `agente_capturas_session_id:${companyId}`;
+    let sessionId = sessionStorage.getItem(sessionKey);
+    const isNewSession = !sessionId;
+    if (!sessionId) {
+      sessionId = makeId();
+      sessionStorage.setItem(sessionKey, sessionId);
+    }
+
+    capturaVisitorIdRef.current = visitorId;
+    capturaSessionIdRef.current = sessionId;
+
+    if (!isNewSession) return;
+
+    const countKey = `agente_capturas_visit_count:${companyId}:${visitorId}`;
+    const visitCount = Number(localStorage.getItem(countKey) ?? '0') + 1;
+    localStorage.setItem(countKey, String(visitCount));
+
+    registrarCaptura('site_visit', `${sessionId}:site_visit`, {
+      rawSlug,
+      path: window.location.pathname,
+      visitCount,
+    });
+
+    if (visitCount > 1) {
+      registrarCaptura('return_visit', `${sessionId}:return_visit`, {
+        visitCount,
+        returnCount: visitCount - 1,
+      });
+    }
+    if (visitCount === 2) {
+      registrarCaptura('return_second_visit', `${visitorId}:return_second_visit`, { visitCount });
+    }
+    if (visitCount === 10) {
+      registrarCaptura('return_tenth_visit', `${visitorId}:return_tenth_visit`, { visitCount });
+    }
+    if (visitCount === 31) {
+      registrarCaptura('return_more_than_30_visits', `${visitorId}:return_more_than_30_visits`, { visitCount });
+    }
+  }, [companyId, rawSlug, registrarCaptura]);
+
+  useEffect(() => {
+    capturaUserDocIdRef.current = userDocId;
+    if (!userDocId || capturaLoggedInRef.current) return;
+    capturaLoggedInRef.current = true;
+    registrarCaptura('logged_in', `${capturaSessionIdRef.current}:logged_in`);
+  }, [registrarCaptura, userDocId]);
+
+  useEffect(() => {
+    if (authLoading || isGuestMode || capturaEnteredWithoutLoginRef.current) return;
+    const needsLogin = !user || user.isAnonymous;
+    if (!needsLogin) return;
+    capturaEnteredWithoutLoginRef.current = true;
+    registrarCaptura('entered_without_login', `${capturaSessionIdRef.current}:entered_without_login`);
+  }, [authLoading, isGuestMode, registrarCaptura, user]);
+
+  useEffect(() => {
+    capturaCartRef.current = carrinho;
+    if (carrinho.length === 0 || capturaCartFilledRef.current) return;
+    capturaCartFilledRef.current = true;
+    registrarCaptura('cart_filled', `${capturaSessionIdRef.current}:cart_filled`, {
+      itens: carrinho.length,
+      quantidadeTotal: carrinho.reduce((sum, item) => sum + item.quantity, 0),
+      total: carrinho.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    });
+  }, [carrinho, registrarCaptura]);
+
+  useEffect(() => {
+    const registrarSaida = () => {
+      if (capturaEnteredWithoutLoginRef.current && !capturaUserDocIdRef.current) {
+        registrarCaptura('left_without_login', `${capturaSessionIdRef.current}:left_without_login`);
+      }
+
+      const cart = capturaCartRef.current;
+      if (cart.length === 0 || capturaOrderCompletedRef.current) return;
+
+      registrarCaptura('cart_not_completed', `${capturaSessionIdRef.current}:cart_not_completed`, {
+        itens: cart.length,
+        quantidadeTotal: cart.reduce((sum, item) => sum + item.quantity, 0),
+        total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      });
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') registrarSaida();
+    };
+
+    window.addEventListener('pagehide', registrarSaida);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', registrarSaida);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [registrarCaptura]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens]);
@@ -465,8 +611,6 @@ const AgentePage: React.FC = () => {
   }, []);
 
   // -------- Autenticação --------
-  const isGuestMode = process.env.NEXT_PUBLIC_GUEST_MODE === 'true';
-
   useEffect(() => {
     if (isGuestMode) {
       // Login anônimo para ter token válido no Firestore
@@ -496,7 +640,7 @@ const AgentePage: React.FC = () => {
               setNomeCliente(nome);
               setUserCpf(data?.cpf ?? '');
               setUserPhone(data?.telefone ?? currentUser.phoneNumber ?? '');
-              if (!nome || nome === 'Cliente') {
+              if (nomeEhPadraoDoSistema(nome)) {
                 setFlowState(FLOW_STATES.COLLECTING_NAME);
               }
             }
@@ -868,6 +1012,26 @@ const AgentePage: React.FC = () => {
     let wFlowState    = flowState;
     let wCart         = [...carrinho];
     let wCustomerData = { ...customerData };
+
+    if (
+      nomeEhPadraoDoSistema(nomeCliente) &&
+      wFlowState !== FLOW_STATES.COLLECTING_NAME &&
+      wFlowState !== FLOW_STATES.COLLECTING_CPF_ONBOARDING
+    ) {
+      wFlowState = FLOW_STATES.COLLECTING_NAME;
+      setFlowState(wFlowState);
+      setMensagens((prev) => [
+        ...prev,
+        {
+          id: `ask-name-${Date.now()}`,
+          role: "assistant",
+          content: "Antes de continuar, como vocÃª gostaria de ser chamado?",
+          timestamp: new Date(),
+        },
+      ]);
+      setEnviando(false);
+      return;
+    }
 
     // ---- Pré-captura direta nos estados de coleta ----
     // Garante que o dado seja salvo mesmo que o agente não emita a tag [SET_*].
@@ -1981,6 +2145,13 @@ const AgentePage: React.FC = () => {
         .slice(-MAX_HIST)
         .map((m) => ({ role: m.role, content: m.content }));
 
+      const taskDecision = runTaskOrchestrator({
+        texto,
+        flowState: wFlowState,
+        carrinho: wCart,
+        produtos,
+      });
+
       // Produtos relevantes (só na navegação)
       let produtosFoco: Produto[] = [];
       let produtosMatchDireto: Produto[] = [];
@@ -2085,6 +2256,20 @@ const AgentePage: React.FC = () => {
         }
 
       // ── Fluxo progressivo para produto não encontrado ──────────────────────
+      if (wFlowState === FLOW_STATES.BROWSING) {
+        const discovery = runProductDiscoveryAgent({
+          texto,
+          produtos,
+          wordKeysEnabled,
+          ultimosProdutosMostrados: ultimosProdutosMostradosRef.current,
+        });
+
+        produtosFoco = discovery.produtosFoco;
+        produtosMatchDireto = discovery.produtosMatchDireto;
+        contextoDetectado = discovery.contextoDetectado;
+        nivelConfianca = discovery.nivelConfianca;
+      }
+
       if (wFlowState === FLOW_STATES.BROWSING && produtosFoco.length === 0 && !ehSaudacaoCurta(texto) && !ehIntencaoSemProduto(texto)) {
         const termoNorm = normalizar(texto).trim();
         const sr = semResultadoRef.current;
@@ -2130,7 +2315,8 @@ const AgentePage: React.FC = () => {
         formasPagamento,
         lojaConfig ?? undefined,
         contextoDetectado,
-        nivelConfianca
+        nivelConfianca,
+        taskDecision.promptHint
       );
 
       // ---- Streaming ----
@@ -2316,6 +2502,7 @@ const AgentePage: React.FC = () => {
           wCustomerData = { ...wCustomerData, name: nomeCliente };
           setCustomerData(wCustomerData);
           const orderResult = await createOrder(companyId, wCustomerData, wCart, userDocId, nomeCliente);
+          capturaOrderCompletedRef.current = true;
 
           // Subscrever notificações push para este cliente
           if ("serviceWorker" in navigator && "PushManager" in window) {
@@ -3239,6 +3426,7 @@ const AgentePage: React.FC = () => {
           taxaEntrega={DELIVERY_PRICE}
           onClose={() => setShowCheckout(false)}
           onSuccess={(orderNumber, total, pixCopyPasteKey, orderId) => {
+            capturaOrderCompletedRef.current = true;
             setShowCheckout(false);
             setCarrinho([]);
             if (pixCopyPasteKey && orderId) setPendingPixOrderId(orderId);

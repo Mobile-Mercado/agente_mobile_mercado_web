@@ -126,7 +126,8 @@ export function buildSystemPrompt(
   formasPagamento: string[] = [],
   lojaConfig?: ConfigLojaPrompt,
   contextoDetectado?: string,
-  nivelConfianca?: NivelConfianca
+  nivelConfianca?: NivelConfianca,
+  taskAgentHint?: string
 ): string {
   const nomeSupermercado = nomeEstabelecimento || 'Mobile Mercado';
   const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -383,6 +384,7 @@ TAGS = comandos do sistema. Sem elas NADA acontece:
   NUNCA confirme ação sem emitir a tag. NUNCA emita [CONFIRM_ORDER] sem endereço e pagamento coletados.
 
 ESTADO ATUAL: ${flowState} — siga SOMENTE o que o estado pede. Não repita perguntas já feitas.
+ROTEAMENTO INTERNO: ${taskAgentHint || 'sem dica adicional'}
 COLETA: nos estados COLLECTING_*, emita [SET_*:valor_exato] — aceite qualquer resposta sem questionar.
 ${cartLine}
 
