@@ -5,7 +5,7 @@ import {
   SafrapayInstallmentType,
   SafrapayTransactionStatus,
 } from "@/lib/safrapay";
-import * as admin from "firebase-admin";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 const endpointMap = {
   hml: "https://payment-hml.safrapay.com.br",
@@ -16,29 +16,6 @@ type SafrapayEnvironment = keyof typeof endpointMap;
 
 function normalizeEnvironment(value: unknown): SafrapayEnvironment {
   return value === "prod" ? "prod" : "hml";
-}
-
-function getAdminDb(): admin.firestore.Firestore | null {
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_ADMIN_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_KEY?.replace(/\\n/g, "\n");
-
-  if (!projectId || !clientEmail || !privateKey) {
-    return null;
-  }
-
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-      databaseURL: `https://${projectId}.firebaseio.com`,
-    });
-  }
-
-  return admin.firestore();
 }
 
 async function resolveSafrapayCredentials(
@@ -56,7 +33,7 @@ async function resolveSafrapayCredentials(
       environment: "prod" as const,
       endpoint: endpointMap.prod,
       source: "firestore",
-      missingFields: ["FIREBASE_ADMIN_EMAIL", "FIREBASE_ADMIN_KEY"],
+      missingFields: ["Firebase Admin SDK"],
     };
   }
 
@@ -267,7 +244,7 @@ export async function POST(request: NextRequest) {
           expiresAt: pixResponse.expiresAt,
           status: pixResponse.status,
           // Para o pedido no Firebase
-          orderStatus: "waitingForPayment",
+          orderStatus: "waitingForOrderPayment",
         });
       } catch (error) {
         console.error("Erro ao processar PIX:", error);

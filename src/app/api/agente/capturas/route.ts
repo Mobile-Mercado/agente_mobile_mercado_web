@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+import { admin, getAdminDb } from "@/lib/firebaseAdmin";
 import type { AgenteCaptureEvent, AgenteCaptureEventType } from "@/services/firestore";
 
 export const dynamic = "force-dynamic";
@@ -29,32 +27,6 @@ const CAPTURE_COUNTER_FIELD: Record<AgenteCaptureEventType, string> = {
   minimum_order_block: "bloqueiosPedidoMinimo",
   feedback_submitted: "feedbacksRecebidos",
 };
-
-function getAdminDb(): admin.firestore.Firestore | null {
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_ADMIN_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_KEY?.replace(/\\n/g, "\n");
-
-  if (!admin.apps.length) {
-    if (projectId && clientEmail && privateKey) {
-      admin.initializeApp({
-        credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-        databaseURL: `https://${projectId}.firebaseio.com`,
-      });
-    } else {
-      const localServiceAccountPath = path.join(process.cwd(), "appmobileprod-19505.json");
-      if (!existsSync(localServiceAccountPath)) return null;
-
-      const serviceAccount = JSON.parse(readFileSync(localServiceAccountPath, "utf8"));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`,
-      });
-    }
-  }
-
-  return admin.firestore();
-}
 
 function isCaptureEventType(value: unknown): value is AgenteCaptureEventType {
   return typeof value === "string" && value in CAPTURE_COUNTER_FIELD;
@@ -103,19 +75,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Evento invalido" }, { status: 400 });
       }
 
-      const root = db.collection("Agentes").doc("AgenteVendas");
-      const eventRef = root.collection("CapturasDados").doc(event.eventId);
-      const metricRef = root.collection("MetricasCapturasPorEstabelecimento").doc(event.companyId);
+      const root = db.collection("AgenteVendas").doc(event.companyId);
+      const eventRef = root.collection("capturasDeDados").doc(event.eventId);
+      const metricRef = root.collection("metricasDeCapturas").doc("resumo");
 
       await db.runTransaction(async (transaction) => {
         const existing = await transaction.get(eventRef);
         if (existing.exists) return;
 
         const now = admin.firestore.FieldValue.serverTimestamp();
-        transaction.set(eventRef, { ...event, createdAt: now });
+        transaction.set(eventRef, {
+          idEvento: event.eventId,
+          tipoEvento: event.eventType,
+          estabelecimentoId: event.companyId,
+          visitanteId: event.visitorId,
+          sessaoId: event.sessionId,
+          usuarioId: event.userDocId,
+          dados: event.metadata,
+          criadoEm: now,
+        });
         transaction.set(metricRef, {
-          companyId: event.companyId,
-          updatedAt: now,
+          estabelecimentoId: event.companyId,
+          atualizadoEm: now,
           [CAPTURE_COUNTER_FIELD[event.eventType]]: admin.firestore.FieldValue.increment(1),
         }, { merge: true });
       });
@@ -133,18 +114,18 @@ export async function POST(request: NextRequest) {
       }
 
       const ref = await db
-        .collection("Agentes")
-        .doc("AgenteVendas")
-        .collection("NotasFeedbacks")
+        .collection("AgenteVendas")
+        .doc(feedback.companyId)
+        .collection("notasEFeedbacks")
         .add({
-          companyId: feedback.companyId,
-          visitorId: feedback.visitorId,
-          sessionId: typeof feedback.sessionId === "string" ? feedback.sessionId : "",
-          userDocId: typeof feedback.userDocId === "string" ? feedback.userDocId : null,
+          estabelecimentoId: feedback.companyId,
+          visitanteId: feedback.visitorId,
+          sessaoId: typeof feedback.sessionId === "string" ? feedback.sessionId : "",
+          usuarioId: typeof feedback.userDocId === "string" ? feedback.userDocId : null,
           nota: typeof feedback.nota === "number" ? feedback.nota : null,
           feedback: typeof feedback.feedback === "string" ? feedback.feedback : "",
           conversaId: typeof feedback.conversaId === "string" ? feedback.conversaId : null,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          criadoEm: admin.firestore.FieldValue.serverTimestamp(),
         });
 
       return NextResponse.json({ success: true, id: ref.id });

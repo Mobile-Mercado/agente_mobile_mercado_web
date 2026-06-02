@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { LogOut, User, MapPin, Save, SlidersHorizontal, X } from "lucide-react";
+import { Check, Copy, Loader2, LogOut, MapPin, Package, Save, SlidersHorizontal, X, User } from "lucide-react";
 import type { EnderecoSalvo } from "@/lib/buildSystemPrompt";
+import { buscarPedidosDoUsuario, type Pedido } from "@/services/firestore";
 import styles from "./SettingsPanel.module.css";
 
 const EMPTY_ENDERECO: EnderecoSalvo = {
@@ -18,6 +19,8 @@ interface SettingsPanelProps {
   nomeCliente: string;
   userCpf: string;
   userPhone: string;
+  companyId?: string;
+  userDocId?: string | null;
   enderecoSalvo: EnderecoSalvo | null;
   onSalvarPerfil: (dados: { nome: string; cpf: string; telefone: string }) => Promise<void>;
   onSalvarEndereco: (end: EnderecoSalvo) => Promise<void>;
@@ -36,6 +39,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   nomeCliente,
   userCpf,
   userPhone,
+  companyId = "",
+  userDocId = null,
   enderecoSalvo,
   onSalvarPerfil,
   onSalvarEndereco,
@@ -53,6 +58,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [salvandoEnd, setSalvandoEnd]         = useState(false);
   const [feedbackPerfil, setFeedbackPerfil]   = useState("");
   const [feedbackEnd, setFeedbackEnd]         = useState("");
+  const [pedidos, setPedidos]                 = useState<Pedido[]>([]);
+  const [carregandoPedidos, setCarregandoPedidos] = useState(false);
+  const [acaoPedidoId, setAcaoPedidoId]       = useState<string | null>(null);
+  const [feedbackPedido, setFeedbackPedido]   = useState("");
+  const [pixCopiadoId, setPixCopiadoId]       = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,8 +72,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setEditEnd(enderecoSalvo ?? EMPTY_ENDERECO);
       setFeedbackPerfil("");
       setFeedbackEnd("");
+      setFeedbackPedido("");
     }
   }, [isOpen, nomeCliente, userCpf, userPhone, enderecoSalvo]);
+
+  useEffect(() => {
+    if (!isOpen || precisaLogin || !companyId || !userDocId) {
+      setPedidos([]);
+      return;
+    }
+
+    let ativo = true;
+    setCarregandoPedidos(true);
+    buscarPedidosDoUsuario(companyId, userDocId, 10)
+      .then((lista) => {
+        if (ativo) setPedidos(lista);
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar pedidos:", error);
+        if (ativo) setFeedbackPedido("Erro ao carregar pedidos.");
+      })
+      .finally(() => {
+        if (ativo) setCarregandoPedidos(false);
+      });
+
+    return () => { ativo = false; };
+  }, [companyId, isOpen, precisaLogin, userDocId]);
 
   const handleSalvarPerfil = async () => {
     setSalvandoPerfil(true);
@@ -103,6 +137,77 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
+  const statusLimpo = (status: string) => status.replace(/^PurchaseStatus\./, "");
+
+  const labelStatus = (status: string) => {
+    const clean = statusLimpo(status);
+    const labels: Record<string, string> = {
+      waitingForOrderPayment: "Aguardando pagamento",
+      waitingForPayment: "Aguardando pagamento",
+      pending: "Pendente",
+      accepted: "Aceito",
+      preparing: "Preparando",
+      delivering: "Em entrega",
+      delivered: "Entregue",
+      canceled: "Cancelado",
+      refundRequested: "Reembolso solicitado",
+    };
+    return labels[clean] ?? (clean || "Status indisponivel");
+  };
+
+  const acaoPedido = (pedido: Pedido) => {
+    const clean = statusLimpo(pedido.currentPurchaseStatus);
+    if (clean === "waitingForOrderPayment" || clean === "waitingForPayment") return "Cancelar pedido";
+    if (clean === "pending") return "Cancelar pedido";
+    if (["accepted", "preparing", "delivering", "delivered"].includes(clean)) return "Solicitar cancelamento";
+    return "";
+  };
+
+  const formatarData = (value: unknown) => {
+    const date =
+      value && typeof value === "object" && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function"
+        ? (value as { toDate: () => Date }).toDate()
+        : null;
+    return date ? date.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+  };
+
+  const copiarPix = async (pedido: Pedido) => {
+    if (!pedido.paymentPixCopyPasteKey) return;
+    await navigator.clipboard.writeText(pedido.paymentPixCopyPasteKey);
+    setPixCopiadoId(pedido.id);
+    window.setTimeout(() => setPixCopiadoId(null), 1600);
+  };
+
+  const handleAcaoPedido = async (pedido: Pedido) => {
+    const label = acaoPedido(pedido);
+    if (!label || !userDocId) return;
+
+    const motivo = window.prompt(`${label} #${pedido.orderNumber}. Informe o motivo:`);
+    if (motivo === null) return;
+
+    setAcaoPedidoId(pedido.id);
+    setFeedbackPedido("");
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/pedidos/acao", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ pedidoId: pedido.id, userDocId, motivo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao processar pedido.");
+      setFeedbackPedido(data.message || "Solicitacao registrada.");
+      if (companyId) setPedidos(await buscarPedidosDoUsuario(companyId, userDocId, 10));
+    } catch (error) {
+      setFeedbackPedido(error instanceof Error ? error.message : "Erro ao processar pedido.");
+    } finally {
+      setAcaoPedidoId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -119,6 +224,71 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className={styles.body}>
           {!precisaLogin && (
             <>
+              {/* Dados pessoais */}
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>
+                  <Package size={15} />
+                  <span>Pedidos</span>
+                </div>
+                {feedbackPedido && <div className={styles.orderFeedback}>{feedbackPedido}</div>}
+                {carregandoPedidos ? (
+                  <div className={styles.orderEmpty}>
+                    <Loader2 size={16} className={styles.spin} />
+                    Carregando pedidos...
+                  </div>
+                ) : pedidos.length === 0 ? (
+                  <div className={styles.orderEmpty}>Nenhum pedido encontrado nesta conta.</div>
+                ) : (
+                  <div className={styles.orderList}>
+                    {pedidos.map((pedido) => {
+                      const buttonLabel = acaoPedido(pedido);
+                      const qrSrc = pedido.paymentPixQrCodeUrl || pedido.paymentPixQrCode || "";
+                      return (
+                        <div className={styles.orderCard} key={pedido.id}>
+                          <div className={styles.orderTop}>
+                            <div>
+                              <div className={styles.orderNumber}>Pedido #{pedido.orderNumber}</div>
+                              <div className={styles.orderDate}>{formatarData(pedido.createdAt)}</div>
+                            </div>
+                            <span className={styles.orderStatus}>{labelStatus(pedido.currentPurchaseStatus)}</span>
+                          </div>
+                          <div className={styles.orderMeta}>
+                            <span>Total: <b>R$ {Number(pedido.total ?? 0).toFixed(2).replace(".", ",")}</b></span>
+                            <span>Entrega: {formatarData(pedido.estimatedTimeDelivery?.date ?? pedido.scheduling) || `${pedido.estimatedTimeDelivery?.intervalMinutes ?? 60} min`}</span>
+                          </div>
+                          <div className={styles.orderItems}>
+                            {pedido.productsCart?.slice(0, 3).map((item, idx) => (
+                              <span key={`${pedido.id}-${idx}`}>{item.quantity}x {item.product?.name ?? "Produto"}</span>
+                            ))}
+                          </div>
+                          {pedido.paymentPixCopyPasteKey && (
+                            <div className={styles.pixBox}>
+                              {qrSrc && <img src={qrSrc} alt="QR Code Pix" className={styles.pixImage} />}
+                              <textarea className={styles.pixTextarea} value={pedido.paymentPixCopyPasteKey} readOnly />
+                              <button className={styles.pixCopyBtn} onClick={() => copiarPix(pedido)}>
+                                {pixCopiadoId === pedido.id ? <Check size={14} /> : <Copy size={14} />}
+                                {pixCopiadoId === pedido.id ? "Copiado" : "Copiar Pix"}
+                              </button>
+                            </div>
+                          )}
+                          {buttonLabel && (
+                            <button
+                              className={styles.orderActionBtn}
+                              onClick={() => handleAcaoPedido(pedido)}
+                              disabled={acaoPedidoId === pedido.id}
+                            >
+                              {acaoPedidoId === pedido.id ? "Processando..." : buttonLabel}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.divider} />
+
               {/* Dados pessoais */}
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>

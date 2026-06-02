@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "firebase:init": "npx firebase-tools@latest init apphosting",
+    "firebase:create-backend": "npx firebase-tools@latest apphosting:backends:create",
+    "firebase:deploy": "npx firebase-tools@latest deploy",
     "lint": "eslint"
   },
   "dependencies": {

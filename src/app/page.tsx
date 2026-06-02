@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { ShoppingCart, Globe, ExternalLink, Search } from "lucide-react";
-import { DOMAIN_SLUGS, LOGO_OVERRIDES, NOME_OVERRIDES } from "@/config/dominios";
+import { DOMAIN_SLUGS, LINK_OVERRIDES, LOGO_OVERRIDES, NOME_OVERRIDES } from "@/config/dominios";
 import { buscarNomeEstabelecimento, buscarLogoEstabelecimento } from "@/services/firestore";
 
 interface Estabelecimento {
@@ -24,7 +24,10 @@ function getEstabelecimentos(): Estabelecimento[] {
     if (seen.has(companyId)) continue;
     seen.add(companyId);
 
-    list.push({ companyId, slug, domain: `www.agentemercado.com.br/${slug}`, nome: null, logo: null, loading: true });
+    const href = LINK_OVERRIDES[slug] ?? `https://www.agentemercado.com.br/${slug}`;
+    const domain = href.replace(/^https?:\/\//, "");
+
+    list.push({ companyId, slug, domain, nome: null, logo: null, loading: true });
   }
 
   return list;
@@ -208,7 +211,7 @@ export default function HomePage() {
 
 function EstabelecimentoCard({ item }: { item: Estabelecimento }) {
   const { companyId, slug, domain, nome, logo, loading } = item;
-  const href = `https://www.agentemercado.com.br/${slug}`;
+  const href = LINK_OVERRIDES[slug] ?? `https://www.agentemercado.com.br/${slug}`;
   const displayNome = nome ?? (loading ? "" : companyId);
 
   if (loading) {

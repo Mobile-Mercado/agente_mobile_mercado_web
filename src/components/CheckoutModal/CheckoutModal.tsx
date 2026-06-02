@@ -6,7 +6,7 @@ import {
   collection, query, where, getDocs, addDoc, updateDoc, deleteDoc,
   doc, Timestamp, GeoPoint,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { createOrder, buscarInfoEstabelecimento, type SafrapayConfig, type PaymentProviderData } from "@/services/firestore";
 import { SLUG_PARA_COMPANY_ID } from "@/config/dominios";
 import type { PixPaymentData } from "./PIXPaymentForm";
@@ -186,6 +186,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [saveCard, setSaveCard]               = useState(false);
   const [pixData, setPixData]                 = useState<PixPaymentData | null>(null);
   const [pixCopied, setPixCopied]             = useState(false);
+  const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [feedbackCancelamento, setFeedbackCancelamento] = useState("");
   const [safrapayError, setSafrapayError]     = useState<string>("");
   const [safrapayConfig, setSafrapayConfig]   = useState<SafrapayConfig | undefined>();
   const [loadingSafrapay, setLoadingSafrapay] = useState(true);
@@ -209,6 +211,34 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     await navigator.clipboard.writeText(pixData.copyPasteKey);
     setPixCopied(true);
     window.setTimeout(() => setPixCopied(false), 1800);
+  };
+
+  const handleSolicitarCancelamentoPedido = async () => {
+    if (!orderResult?.id) return;
+
+    const motivo = window.prompt("Informe o motivo do cancelamento:");
+    if (motivo === null) return;
+
+    setCancelandoPedido(true);
+    setFeedbackCancelamento("");
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/pedidos/acao", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ pedidoId: orderResult.id, userDocId, motivo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao processar pedido.");
+      setFeedbackCancelamento(data.message || "Solicitacao registrada.");
+    } catch (error) {
+      setFeedbackCancelamento(error instanceof Error ? error.message : "Erro ao processar pedido.");
+    } finally {
+      setCancelandoPedido(false);
+    }
   };
 
   useEffect(() => {
@@ -433,13 +463,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (payId === "pix" && pixData) {
         paymentStatus = "waitingForPayment";
-        purchaseStatus = "PurchaseStatus.waitingForPayment";
+        purchaseStatus = "PurchaseStatus.waitingForOrderPayment";
         paymentTransactionId = pixData.transactionId || "";
         paymentChargeId = pixData.chargeId || "";
         paymentExpiresAt = pixData.expiresAt || "";
       } else if (payId === "pix" && safrapayConfig?.enabled) {
         paymentStatus = "waitingForPayment";
-        purchaseStatus = "PurchaseStatus.waitingForPayment";
+        purchaseStatus = "PurchaseStatus.waitingForOrderPayment";
       } else if (payId === "credito" && cardData) {
         // Validar se Safrapay está configurado
         if (!safrapayConfig || !safrapayConfig.enabled) {
@@ -525,6 +555,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               paymentTransactionId,
               paymentChargeId,
               paymentExpiresAt,
+              paymentPixCopyPasteKey: pixData?.copyPasteKey,
+              paymentPixQrCode: pixData?.qrCode,
+              paymentPixQrCodeUrl: pixData?.qrCodeUrl,
             }
           : undefined;
 
@@ -577,9 +610,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         await updateDoc(doc(db, "PurchaseRequests", result.id), {
           paymentProvider: "safrapay",
           paymentStatus: "waitingForPayment",
+          currentPurchaseStatus: "PurchaseStatus.waitingForOrderPayment",
           paymentTransactionId: pixPaymentData.transactionId || null,
           paymentChargeId: pixPaymentData.chargeId || null,
           paymentExpiresAt: pixPaymentData.expiresAt || null,
+          paymentPixCopyPasteKey: pixPaymentData.copyPasteKey || null,
+          paymentPixQrCode: pixPaymentData.qrCode || null,
+          paymentPixQrCodeUrl: pixPaymentData.qrCodeUrl || null,
           updatedAt: Timestamp.now(),
         });
       }
@@ -688,6 +725,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </button>
             </div>
           )}
+          {feedbackCancelamento && (
+            <p className={styles.cancelFeedback}>{feedbackCancelamento}</p>
+          )}
+          <button
+            type="button"
+            className={styles.cancelOrderButton}
+            onClick={handleSolicitarCancelamentoPedido}
+            disabled={cancelandoPedido}
+          >
+            {cancelandoPedido ? "Processando..." : pixData?.copyPasteKey ? "Cancelar pedido" : "Solicitar cancelamento"}
+          </button>
           <button
             className={styles.successBtn}
             onClick={() => onSuccess(orderResult.orderNumber, orderResult.total, pixData?.copyPasteKey, orderResult.id)}

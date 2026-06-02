@@ -12,6 +12,12 @@ App Next.js 15 + React 19 + TypeScript para um assistente de compras de supermer
 - `npm run build`: build de producao.
 - `npm run lint`: ESLint.
 - Deploy: Render usa `render.yaml` com `npm install && npm run build` e `npm start`.
+- Deploy paralelo Firebase: `apphosting.yaml` prepara Firebase App Hosting sem alterar Render.
+- `npm run firebase:init`: inicializa App Hosting localmente.
+- `npm run firebase:create-backend`: cria backend App Hosting no projeto Firebase selecionado.
+- `npm run firebase:deploy`: deploy pelo Firebase CLI.
+- `.firebaserc` e local/ignorado; use `.firebaserc.example` como modelo quando o Project ID for conhecido.
+- Segredos de producao devem ficar no Firebase Console/Secret Manager, nao no git.
 
 ## Arquivos principais
 
@@ -24,6 +30,7 @@ App Next.js 15 + React 19 + TypeScript para um assistente de compras de supermer
 - `src/config/dominios.ts`: cadastro de slugs, companyIds, overrides de nome/logo e `COMPANY_DATA_SOURCE`.
 - `src/components/CheckoutModal/*`: checkout visual, endereco, pagamento, Safrapay PIX/cartao.
 - `src/lib/safrapay.ts` e `src/app/api/payment/safrapay/route.ts`: cliente e API de pagamento Safrapay.
+- `src/lib/firebaseAdmin.ts`: inicializacao server-side do Firebase Admin. Aceita env/local JSON no Render e credencial automatica no Firebase App Hosting.
 - `src/app/api/chat/route.ts`: chamada OpenAI streaming. Modelo atual: `gpt-4o-mini`.
 - `src/app/api/transcribe/route.ts`: transcricao de audio.
 - `src/app/api/push/*`: inscricao e notificacao push.
@@ -101,9 +108,9 @@ Colecoes usadas:
 - `PurchaseRequests`
 - `AgenteVendas/{userId}/conversas/{conversaId}/mensagens`
 - `Agentes/AgenteVendas/ExemplosConversa`
-- `Agentes/AgenteVendas/CapturasDados`
-- `Agentes/AgenteVendas/MetricasCapturasPorEstabelecimento/{companyId}`
-- `Agentes/AgenteVendas/NotasFeedbacks`
+- `AgenteVendas/{companyId}/capturasDeDados`
+- `AgenteVendas/{companyId}/metricasDeCapturas/resumo`
+- `AgenteVendas/{companyId}/notasEFeedbacks`
 
 `COMPANY_DATA_SOURCE` em `dominios.ts` permite um estabelecimento usar dados de outro.
 
@@ -111,9 +118,9 @@ Colecoes usadas:
 
 Eventos sao registrados por `registrarCapturaDadosAgente` em `src/services/firestore.ts`.
 
-- Eventos individuais: `Agentes/AgenteVendas/CapturasDados`
-- Contadores por mercado: `Agentes/AgenteVendas/MetricasCapturasPorEstabelecimento/{companyId}`
-- Notas e feedbacks: `Agentes/AgenteVendas/NotasFeedbacks`
+- Eventos individuais: `AgenteVendas/{companyId}/capturasDeDados`
+- Contadores por mercado: `AgenteVendas/{companyId}/metricasDeCapturas/resumo`
+- Notas e feedbacks: `AgenteVendas/{companyId}/notasEFeedbacks`
 
 Eventos atuais:
 
@@ -139,6 +146,7 @@ Eventos atuais:
 - `feedback_submitted`: nota ou feedback recebido.
 
 Os eventos usam `eventId` deterministico e transacao Firestore para evitar incrementar contadores duplicados.
+No Firestore, os documentos de captura usam campos em portugues: `idEvento`, `tipoEvento`, `estabelecimentoId`, `visitanteId`, `sessaoId`, `usuarioId`, `dados` e `criadoEm`.
 
 ## Safrapay
 

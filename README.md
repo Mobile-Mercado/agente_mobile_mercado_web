@@ -18,6 +18,55 @@ O Render detecta automaticamente e publica em alguns minutos.
 
 ---
 
+## Deploy paralelo no Firebase App Hosting
+
+O projeto agora pode ser preparado para rodar tambem no Firebase App Hosting, sem alterar a configuracao do Render.
+
+Use esse caminho para testar a migracao:
+
+```bash
+npm run firebase:init
+```
+
+Depois copie `.firebaserc.example` para `.firebaserc` e troque `COLOQUE_AQUI_O_PROJECT_ID_DO_FIREBASE` pelo Project ID do Firebase do socio. O arquivo `.firebaserc` fica local e nao deve ir para o git.
+
+Crie o backend do App Hosting:
+
+```bash
+npm run firebase:create-backend
+```
+
+O Firebase vai pedir a regiao, o repositorio GitHub, a branch principal e o diretorio raiz do app. Para este projeto, o diretorio raiz e `/`.
+
+No Firebase Console, em App Hosting > Backend > Settings > Environment, configure as variaveis do `.env.example`. As chaves sensiveis devem ser secrets:
+
+- `OPENAI_API_KEY`
+- `ADMIN_SECRET`
+- `SAFRAPAY_MERCHANT_ID`
+- `SAFRAPAY_MERCHANT_TOKEN`
+- `SAFRAPAY_WEBHOOK_SECRET`
+- `VAPID_PRIVATE_KEY`
+
+As variaveis `NEXT_PUBLIC_FIREBASE_*` precisam estar disponiveis em build e runtime.
+
+Depois de configurar o backend e as variaveis:
+
+```bash
+npm run firebase:deploy
+```
+
+Importante: o Firebase App Hosting usa Blaze/pay-as-you-go. Com `minInstances: 0` em `apphosting.yaml`, nao ha instancia fixa ligada o tempo todo, mas ainda pode haver cobranca se passar das cotas sem custo, se houver muito trafego, builds, logs, storage ou chamadas externas.
+
+Antes de trocar dominio, teste no link `hosted.app`:
+
+- chat com streaming em `/api/chat`
+- pagamento Safrapay em `/api/payment/safrapay`
+- webhook PIX em `/api/webhook/safrapay/pix`
+- capturas em `/api/agente/capturas`
+- login SMS e aceite dos termos
+
+---
+
 ## Cadastrar um novo estabelecimento
 
 **Arquivo:** `src/config/dominios.ts`

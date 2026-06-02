@@ -1010,7 +1010,19 @@ const AgentePage: React.FC = () => {
   };
 
   const handleAuthVerifyCode = async () => {
-    if (!authConfirmation || authCode.length !== 6 || !authAcceptTerms) return;
+    if (!authConfirmation || authCode.length !== 6) return;
+    if (!authAcceptTerms) {
+      setMensagens(prev => [
+        ...prev.filter(m => m.id !== 'auth-code-error'),
+        {
+          id: 'auth-code-error',
+          role: 'assistant',
+          content: 'Para continuar, marque "Li e aceito os Termos de Uso e a PolÃ­tica de Privacidade".',
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
     setAuthSending(true);
     setAuthCodeError('');
     try {
@@ -2929,6 +2941,8 @@ const AgentePage: React.FC = () => {
         nomeCliente={nomeCliente}
         userCpf={userCpf}
         userPhone={userPhone}
+        companyId={companyId}
+        userDocId={userDocId}
         enderecoSalvo={enderecoSalvo}
         onSalvarPerfil={async ({ nome, cpf, telefone }) => {
           if (!userDocId) return;
@@ -3458,7 +3472,7 @@ const AgentePage: React.FC = () => {
                 else handleAuthSendCode();
               }
             }}
-            disabled={authSending || authStep === 'validating' || (authStep === 'code_modal' && !authAcceptTerms)}
+            disabled={authSending || authStep === 'validating'}
           />
         ) : (
           <textarea
@@ -3502,7 +3516,7 @@ const AgentePage: React.FC = () => {
           }}
           disabled={
             !precisaLogin ? (!inputText.trim() || enviando || !produtosCarregados) :
-            authStep === 'code_modal' ? (authCode.length !== 6 || !authAcceptTerms || authSending) :
+            authStep === 'code_modal' ? (authCode.length !== 6 || authSending) :
             (!authPhone.trim() || authSending || authStep === 'validating')
           }
           aria-label="Enviar mensagem"

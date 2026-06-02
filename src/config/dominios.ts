@@ -9,6 +9,10 @@ export const DOMAIN_SLUGS: Record<string, string> = {
   'gs':       'GkFYWdOBKD1vbzYoem9K',  // gs.agentemercado.com.br
 };
 
+export const LINK_OVERRIDES: Record<string, string> = {
+  uaumart: 'https://agente-mobile-mercado--appmobileprod-19505.us-east4.hosted.app/uaumart',
+};
+
 // Mapa de slug em minúsculo → ID real do Firestore (com casing correto)
 // Usado para resolver URLs que chegam em lowercase
 export const SLUG_PARA_COMPANY_ID: Record<string, string> = Object.fromEntries(

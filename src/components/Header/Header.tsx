@@ -14,6 +14,8 @@ interface HeaderProps {
   nomeCliente?: string;
   userPhone?: string;
   userCpf?: string;
+  companyId?: string;
+  userDocId?: string | null;
   enderecoSalvo?: EnderecoSalvo | null;
   onSalvarPerfil?: (dados: { nome: string; cpf: string; telefone: string }) => Promise<void>;
   onSalvarEndereco?: (end: EnderecoSalvo) => Promise<void>;
@@ -35,6 +37,8 @@ const Header: React.FC<HeaderProps> = ({
   nomeCliente = "",
   userPhone = "",
   userCpf = "",
+  companyId = "",
+  userDocId = null,
   enderecoSalvo = null,
   onSalvarPerfil,
   onSalvarEndereco,
@@ -97,6 +101,8 @@ const Header: React.FC<HeaderProps> = ({
         nomeCliente={nomeCliente}
         userCpf={userCpf}
         userPhone={userPhone}
+        companyId={companyId}
+        userDocId={userDocId}
         enderecoSalvo={enderecoSalvo}
         onSalvarPerfil={onSalvarPerfil ?? (async () => {})}
         onSalvarEndereco={onSalvarEndereco ?? (async () => {})}

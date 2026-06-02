@@ -148,6 +148,9 @@ export interface PaymentProviderData {
   paymentTransactionId?: string;
   paymentChargeId?: string;
   paymentExpiresAt?: string;
+  paymentPixCopyPasteKey?: string;
+  paymentPixQrCode?: string;
+  paymentPixQrCodeUrl?: string;
 }
 
 export async function criarOuObterUsuarioConvidado(): Promise<string> {
@@ -537,6 +540,9 @@ export async function createOrder(
     paymentTransactionId: paymentProviderData?.paymentTransactionId ?? null,
     paymentChargeId: paymentProviderData?.paymentChargeId ?? null,
     paymentExpiresAt: paymentProviderData?.paymentExpiresAt ?? null,
+    paymentPixCopyPasteKey: paymentProviderData?.paymentPixCopyPasteKey ?? null,
+    paymentPixQrCode: paymentProviderData?.paymentPixQrCode ?? null,
+    paymentPixQrCodeUrl: paymentProviderData?.paymentPixQrCodeUrl ?? null,
     scheduling:            deliveryTs,
     schedule: {
       id:                  scheduleId,
@@ -917,9 +923,22 @@ export interface Pedido {
   orderNumber: string;
   clientName: string;
   clientId: string;
+  price?: number;
+  deliveryPrice?: number;
   total: number;
   currentPurchaseStatus: string;
+  paymentProvider?: string | null;
+  paymentStatus?: string | null;
+  paymentTransactionId?: string | null;
+  paymentChargeId?: string | null;
+  paymentExpiresAt?: string | null;
+  paymentPixCopyPasteKey?: string | null;
+  paymentPixQrCode?: string | null;
+  paymentPixQrCodeUrl?: string | null;
+  refundStatus?: string | null;
+  cancelReason?: string | null;
   createdAt: Timestamp;
+  scheduling?: Timestamp;
   address: {
     fullAddress: string;
     street: string;
@@ -927,8 +946,8 @@ export interface Pedido {
     neighborhood: string;
     city: string;
   };
-  productsCart: Array<{ product: { name: string }; quantity: number }>;
-  estimatedTimeDelivery?: { intervalMinutes: number };
+  productsCart: Array<{ product: { name: string; price?: number }; quantity: number }>;
+  estimatedTimeDelivery?: { date?: Timestamp; intervalMinutes: number };
 }
 
 export async function buscarPedidosPorEstabelecimento(
