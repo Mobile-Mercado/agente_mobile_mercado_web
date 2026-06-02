@@ -23,7 +23,6 @@ export const SLUG_PARA_COMPANY_ID: Record<string, string> = Object.fromEntries(
 // Use quando o estabelecimento ainda não tem dados próprios no Firestore
 export const COMPANY_DATA_SOURCE: Record<string, string> = {
   XAXMOP6aweRbBAb0gUvU: UAU_MART_COMPANY_ID,
-  GkFYWdOBKD1vbzYoem9K: UAU_MART_COMPANY_ID,
 };
 
 // Logos locais por companyId (sobrescrevem o Firestore)

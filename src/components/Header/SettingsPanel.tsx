@@ -11,6 +11,8 @@ const EMPTY_ENDERECO: EnderecoSalvo = {
   street: "", number: "", neighborhood: "", city: "", state: "", zipCode: "",
 };
 
+type MenuSection = "pedidos" | "cliente" | "endereco";
+
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,6 +65,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [acaoPedidoId, setAcaoPedidoId]       = useState<string | null>(null);
   const [feedbackPedido, setFeedbackPedido]   = useState("");
   const [pixCopiadoId, setPixCopiadoId]       = useState<string | null>(null);
+  const [activeSection, setActiveSection]      = useState<MenuSection>("pedidos");
 
   useEffect(() => {
     if (isOpen) {
@@ -73,6 +76,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setFeedbackPerfil("");
       setFeedbackEnd("");
       setFeedbackPedido("");
+      setActiveSection("pedidos");
     }
   }, [isOpen, nomeCliente, userCpf, userPhone, enderecoSalvo]);
 
@@ -234,160 +238,186 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className={styles.body}>
           {!precisaLogin && (
             <>
-              {/* Dados pessoais */}
-              <div className={styles.section}>
-                <div className={styles.sectionTitle}>
+              <div className={styles.menuGrid} aria-label="Opções do menu">
+                <button
+                  type="button"
+                  className={`${styles.menuOption} ${activeSection === "pedidos" ? styles.menuOptionActive : ""}`}
+                  onClick={() => setActiveSection("pedidos")}
+                >
                   <Package size={15} />
                   <span>Pedidos</span>
-                </div>
-                {feedbackPedido && <div className={styles.orderFeedback}>{feedbackPedido}</div>}
-                {carregandoPedidos ? (
-                  <div className={styles.orderEmpty}>
-                    <Loader2 size={16} className={styles.spin} />
-                    Carregando pedidos...
-                  </div>
-                ) : pedidos.length === 0 ? (
-                  <div className={styles.orderEmpty}>Nenhum pedido encontrado nesta conta.</div>
-                ) : (
-                  <div className={styles.orderList}>
-                    {pedidos.map((pedido) => {
-                      const buttonLabel = acaoPedido(pedido);
-                      const qrSrc = pedido.paymentPixQrCodeUrl || pedido.paymentPixQrCode || "";
-                      return (
-                        <div className={styles.orderCard} key={pedido.id}>
-                          <div className={styles.orderTop}>
-                            <div>
-                              <div className={styles.orderNumber}>Pedido #{pedido.orderNumber}</div>
-                              <div className={styles.orderDate}>{formatarData(pedido.createdAt)}</div>
-                            </div>
-                            <span className={styles.orderStatus}>{labelStatus(pedido.currentPurchaseStatus)}</span>
-                          </div>
-                          <div className={styles.orderMeta}>
-                            <span>Total: <b>R$ {Number(pedido.total ?? 0).toFixed(2).replace(".", ",")}</b></span>
-                            <span>Entrega: {formatarData(pedido.estimatedTimeDelivery?.date ?? pedido.scheduling) || `${pedido.estimatedTimeDelivery?.intervalMinutes ?? 60} min`}</span>
-                          </div>
-                          <div className={styles.orderItems}>
-                            {pedido.productsCart?.slice(0, 3).map((item, idx) => (
-                              <span key={`${pedido.id}-${idx}`}>{item.quantity}x {item.product?.name ?? "Produto"}</span>
-                            ))}
-                          </div>
-                          {pedido.paymentPixCopyPasteKey && (
-                            <div className={styles.pixBox}>
-                              {qrSrc && <img src={qrSrc} alt="QR Code Pix" className={styles.pixImage} />}
-                              <textarea className={styles.pixTextarea} value={pedido.paymentPixCopyPasteKey} readOnly />
-                              <button className={styles.pixCopyBtn} onClick={() => copiarPix(pedido)}>
-                                {pixCopiadoId === pedido.id ? <Check size={14} /> : <Copy size={14} />}
-                                {pixCopiadoId === pedido.id ? "Copiado" : "Copiar Pix"}
-                              </button>
-                            </div>
-                          )}
-                          {buttonLabel && (
-                            <button
-                              className={styles.orderActionBtn}
-                              onClick={() => handleAcaoPedido(pedido)}
-                              disabled={acaoPedidoId === pedido.id}
-                            >
-                              {acaoPedidoId === pedido.id ? "Processando..." : buttonLabel}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.divider} />
-
-              {/* Dados pessoais */}
-              <div className={styles.section}>
-                <div className={styles.sectionTitle}>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.menuOption} ${activeSection === "cliente" ? styles.menuOptionActive : ""}`}
+                  onClick={() => setActiveSection("cliente")}
+                >
                   <User size={15} />
-                  <span>Dados Pessoais</span>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Nome</label>
-                  <input className={styles.input} type="text" value={editNome}
-                    onChange={(e) => setEditNome(e.target.value)}
-                    placeholder="Como você gostaria de ser chamado?" />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>CPF</label>
-                  <input className={styles.input} type="text" value={editCpf}
-                    onChange={(e) => setEditCpf(e.target.value)}
-                    placeholder="000.000.000-00" inputMode="numeric" />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Telefone</label>
-                  <input className={styles.input} type="tel" value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="+55 (00) 00000-0000" inputMode="tel" />
-                </div>
-                <div className={styles.saveRow}>
-                  {feedbackPerfil && <span className={styles.feedback}>{feedbackPerfil}</span>}
-                  <button className={styles.saveBtn} onClick={handleSalvarPerfil} disabled={salvandoPerfil}>
-                    <Save size={14} />
-                    {salvandoPerfil ? "Salvando..." : "Salvar dados"}
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.divider} />
-
-              {/* Endereço */}
-              <div className={styles.section}>
-                <div className={styles.sectionTitle}>
+                  <span>Cliente</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.menuOption} ${activeSection === "endereco" ? styles.menuOptionActive : ""}`}
+                  onClick={() => setActiveSection("endereco")}
+                >
                   <MapPin size={15} />
-                  <span>Endereço de Entrega</span>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Rua / Avenida</label>
-                  <input className={styles.input} type="text" value={editEnd.street}
-                    onChange={(e) => setEditEnd((p) => ({ ...p, street: e.target.value }))}
-                    placeholder="Ex: Rua das Flores" />
-                </div>
-                <div className={styles.fieldRow}>
-                  <div className={styles.field} style={{ flex: 2 }}>
-                    <label className={styles.label}>Bairro</label>
-                    <input className={styles.input} type="text" value={editEnd.neighborhood}
-                      onChange={(e) => setEditEnd((p) => ({ ...p, neighborhood: e.target.value }))}
-                      placeholder="Bairro" />
-                  </div>
-                  <div className={styles.field} style={{ flex: 1 }}>
-                    <label className={styles.label}>Número</label>
-                    <input className={styles.input} type="text" value={editEnd.number}
-                      onChange={(e) => setEditEnd((p) => ({ ...p, number: e.target.value }))}
-                      placeholder="Nº" />
-                  </div>
-                </div>
-                <div className={styles.fieldRow}>
-                  <div className={styles.field} style={{ flex: 2 }}>
-                    <label className={styles.label}>Cidade</label>
-                    <input className={styles.input} type="text" value={editEnd.city}
-                      onChange={(e) => setEditEnd((p) => ({ ...p, city: e.target.value }))}
-                      placeholder="Cidade" />
-                  </div>
-                  <div className={styles.field} style={{ flex: 1 }}>
-                    <label className={styles.label}>Estado</label>
-                    <input className={styles.input} type="text" value={editEnd.state}
-                      onChange={(e) => setEditEnd((p) => ({ ...p, state: e.target.value }))}
-                      placeholder="UF" maxLength={2} />
-                  </div>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>CEP</label>
-                  <input className={styles.input} type="text" value={editEnd.zipCode}
-                    onChange={(e) => setEditEnd((p) => ({ ...p, zipCode: e.target.value }))}
-                    placeholder="00000-000" inputMode="numeric" />
-                </div>
-                <div className={styles.saveRow}>
-                  {feedbackEnd && <span className={styles.feedback}>{feedbackEnd}</span>}
-                  <button className={styles.saveBtn} onClick={handleSalvarEndereco} disabled={salvandoEnd}>
-                    <Save size={14} />
-                    {salvandoEnd ? "Salvando..." : "Salvar endereço"}
-                  </button>
-                </div>
+                  <span>Endereço</span>
+                </button>
               </div>
+
+              {activeSection === "pedidos" && (
+                <div className={styles.section}>
+                  <div className={styles.sectionTitle}>
+                    <Package size={15} />
+                    <span>Pedidos</span>
+                  </div>
+                  {feedbackPedido && <div className={styles.orderFeedback}>{feedbackPedido}</div>}
+                  {carregandoPedidos ? (
+                    <div className={styles.orderEmpty}>
+                      <Loader2 size={16} className={styles.spin} />
+                      Carregando pedidos...
+                    </div>
+                  ) : pedidos.length === 0 ? (
+                    <div className={styles.orderEmpty}>Nenhum pedido encontrado nesta conta.</div>
+                  ) : (
+                    <div className={styles.orderList}>
+                      {pedidos.map((pedido) => {
+                        const buttonLabel = acaoPedido(pedido);
+                        const qrSrc = pedido.paymentPixQrCodeUrl || pedido.paymentPixQrCode || "";
+                        return (
+                          <div className={styles.orderCard} key={pedido.id}>
+                            <div className={styles.orderTop}>
+                              <div>
+                                <div className={styles.orderNumber}>Pedido #{pedido.orderNumber}</div>
+                                <div className={styles.orderDate}>{formatarData(pedido.createdAt)}</div>
+                              </div>
+                              <span className={styles.orderStatus}>{labelStatus(pedido.currentPurchaseStatus)}</span>
+                            </div>
+                            <div className={styles.orderMeta}>
+                              <span>Total: <b>R$ {Number(pedido.total ?? 0).toFixed(2).replace(".", ",")}</b></span>
+                              <span>Entrega: {formatarData(pedido.estimatedTimeDelivery?.date ?? pedido.scheduling) || `${pedido.estimatedTimeDelivery?.intervalMinutes ?? 60} min`}</span>
+                            </div>
+                            <div className={styles.orderItems}>
+                              {pedido.productsCart?.slice(0, 3).map((item, idx) => (
+                                <span key={`${pedido.id}-${idx}`}>{item.quantity}x {item.product?.name ?? "Produto"}</span>
+                              ))}
+                            </div>
+                            {pedido.paymentPixCopyPasteKey && (
+                              <div className={styles.pixBox}>
+                                {qrSrc && <img src={qrSrc} alt="QR Code Pix" className={styles.pixImage} />}
+                                <textarea className={styles.pixTextarea} value={pedido.paymentPixCopyPasteKey} readOnly />
+                                <button className={styles.pixCopyBtn} onClick={() => copiarPix(pedido)}>
+                                  {pixCopiadoId === pedido.id ? <Check size={14} /> : <Copy size={14} />}
+                                  {pixCopiadoId === pedido.id ? "Copiado" : "Copiar Pix"}
+                                </button>
+                              </div>
+                            )}
+                            {buttonLabel && (
+                              <button
+                                className={styles.orderActionBtn}
+                                onClick={() => handleAcaoPedido(pedido)}
+                                disabled={acaoPedidoId === pedido.id}
+                              >
+                                {acaoPedidoId === pedido.id ? "Processando..." : buttonLabel}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeSection === "cliente" && (
+                <div className={styles.section}>
+                  <div className={styles.sectionTitle}>
+                    <User size={15} />
+                    <span>Dados Pessoais</span>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Nome</label>
+                    <input className={styles.input} type="text" value={editNome}
+                      onChange={(e) => setEditNome(e.target.value)}
+                      placeholder="Como você gostaria de ser chamado?" />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>CPF</label>
+                    <input className={styles.input} type="text" value={editCpf}
+                      onChange={(e) => setEditCpf(e.target.value)}
+                      placeholder="000.000.000-00" inputMode="numeric" />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Telefone</label>
+                    <input className={styles.input} type="tel" value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="+55 (00) 00000-0000" inputMode="tel" />
+                  </div>
+                  <div className={styles.saveRow}>
+                    {feedbackPerfil && <span className={styles.feedback}>{feedbackPerfil}</span>}
+                    <button className={styles.saveBtn} onClick={handleSalvarPerfil} disabled={salvandoPerfil}>
+                      <Save size={14} />
+                      {salvandoPerfil ? "Salvando..." : "Salvar dados"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === "endereco" && (
+                <div className={styles.section}>
+                  <div className={styles.sectionTitle}>
+                    <MapPin size={15} />
+                    <span>Endereço de Entrega</span>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Rua / Avenida</label>
+                    <input className={styles.input} type="text" value={editEnd.street}
+                      onChange={(e) => setEditEnd((p) => ({ ...p, street: e.target.value }))}
+                      placeholder="Ex: Rua das Flores" />
+                  </div>
+                  <div className={styles.fieldRow}>
+                    <div className={styles.field} style={{ flex: 2 }}>
+                      <label className={styles.label}>Bairro</label>
+                      <input className={styles.input} type="text" value={editEnd.neighborhood}
+                        onChange={(e) => setEditEnd((p) => ({ ...p, neighborhood: e.target.value }))}
+                        placeholder="Bairro" />
+                    </div>
+                    <div className={styles.field} style={{ flex: 1 }}>
+                      <label className={styles.label}>Número</label>
+                      <input className={styles.input} type="text" value={editEnd.number}
+                        onChange={(e) => setEditEnd((p) => ({ ...p, number: e.target.value }))}
+                        placeholder="Nº" />
+                    </div>
+                  </div>
+                  <div className={styles.fieldRow}>
+                    <div className={styles.field} style={{ flex: 2 }}>
+                      <label className={styles.label}>Cidade</label>
+                      <input className={styles.input} type="text" value={editEnd.city}
+                        onChange={(e) => setEditEnd((p) => ({ ...p, city: e.target.value }))}
+                        placeholder="Cidade" />
+                    </div>
+                    <div className={styles.field} style={{ flex: 1 }}>
+                      <label className={styles.label}>Estado</label>
+                      <input className={styles.input} type="text" value={editEnd.state}
+                        onChange={(e) => setEditEnd((p) => ({ ...p, state: e.target.value }))}
+                        placeholder="UF" maxLength={2} />
+                    </div>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>CEP</label>
+                    <input className={styles.input} type="text" value={editEnd.zipCode}
+                      onChange={(e) => setEditEnd((p) => ({ ...p, zipCode: e.target.value }))}
+                      placeholder="00000-000" inputMode="numeric" />
+                  </div>
+                  <div className={styles.saveRow}>
+                    {feedbackEnd && <span className={styles.feedback}>{feedbackEnd}</span>}
+                    <button className={styles.saveBtn} onClick={handleSalvarEndereco} disabled={salvandoEnd}>
+                      <Save size={14} />
+                      {salvandoEnd ? "Salvando..." : "Salvar endereço"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className={styles.divider} />
 

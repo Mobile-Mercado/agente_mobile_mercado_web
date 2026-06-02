@@ -74,6 +74,43 @@
   gap: 0;
 }
 
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.menuOption {
+  min-height: 72px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.menuOption svg {
+  color: #6b7280;
+}
+
+.menuOptionActive {
+  border-color: #3632f8;
+  background: #eef2ff;
+  color: #1f2937;
+}
+
+.menuOptionActive svg {
+  color: #3632f8;
+}
+
 /* ── Section ── */
 .section {
   display: flex;
