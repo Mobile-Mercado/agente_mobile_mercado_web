@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
 
     const pedidoRef = db.collection("PurchaseRequests").doc(pedidoId);
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const statusCreatedAt = admin.firestore.Timestamp.now();
 
     const result = await db.runTransaction(async (transaction) => {
       const pedidoSnap = await transaction.get(pedidoRef);
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
           cancelRequestedAt: now,
           canceledAt: now,
           updatedAt: now,
-          statusList: [...statusListAtual, { purchaseStatus: novoStatus, createdAt: now }],
+          statusList: [...statusListAtual, { purchaseStatus: novoStatus, createdAt: statusCreatedAt }],
         });
         transaction.set(requestRef, {
           tipo: "cancelamento_local",
@@ -92,7 +93,15 @@ export async function POST(request: NextRequest) {
           pagamento: paymentProvider,
           criadoEm: now,
         });
-        return { status: 200, body: { success: true, action: "canceled", message: "Pedido cancelado." } };
+        return {
+          status: 200,
+          body: {
+            success: true,
+            action: "canceled",
+            updatedStatus: novoStatus,
+            message: "Pedido cancelado. Como o Pix ainda nao foi pago, nao ha reembolso a processar.",
+          },
+        };
       }
 
       if (isRefundRequestStatus(statusAtual)) {
@@ -106,7 +115,7 @@ export async function POST(request: NextRequest) {
           refundRequestedAt: paymentProvider === "safrapay" ? now : null,
           cancelRequestedAt: now,
           updatedAt: now,
-          statusList: [...statusListAtual, { purchaseStatus: novoStatus, createdAt: now }],
+          statusList: [...statusListAtual, { purchaseStatus: novoStatus, createdAt: statusCreatedAt }],
         });
         transaction.set(requestRef, {
           tipo: paymentProvider === "safrapay" ? "solicitacao_reembolso" : "cancelamento",
@@ -120,6 +129,7 @@ export async function POST(request: NextRequest) {
           body: {
             success: true,
             action: paymentProvider === "safrapay" ? "refundRequested" : "canceled",
+            updatedStatus: novoStatus,
             message: paymentProvider === "safrapay"
               ? "Solicitacao de reembolso enviada para analise."
               : "Pedido cancelado.",
@@ -146,6 +156,7 @@ export async function POST(request: NextRequest) {
           body: {
             success: true,
             action: "supportRequested",
+            updatedStatus: pedido.currentPurchaseStatus,
             message: "Solicitacao enviada para atendimento da loja.",
           },
         };

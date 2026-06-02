@@ -200,9 +200,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Erro ao processar pedido.");
       setFeedbackPedido(data.message || "Solicitacao registrada.");
+      if (typeof data.updatedStatus === "string") {
+        setPedidos((prev) => prev.map((item) => (
+          item.id === pedido.id ? { ...item, currentPurchaseStatus: data.updatedStatus } : item
+        )));
+      }
       if (companyId) setPedidos(await buscarPedidosDoUsuario(companyId, userDocId, 10));
     } catch (error) {
-      setFeedbackPedido(error instanceof Error ? error.message : "Erro ao processar pedido.");
+      const message = error instanceof TypeError
+        ? "Nao foi possivel conectar ao servidor de pedidos. Publique a versao atual no Firebase/Render e tente novamente."
+        : error instanceof Error
+          ? error.message
+          : "Erro ao processar pedido.";
+      setFeedbackPedido(message);
     } finally {
       setAcaoPedidoId(null);
     }

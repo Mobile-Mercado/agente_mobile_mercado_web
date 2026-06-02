@@ -55,6 +55,10 @@ function formatarPreco(v: number) {
   return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function criarPixExpiresAt(): string {
+  return new Date(Date.now() + 30 * 60 * 1000).toISOString();
+}
+
 function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   const toRad = (v: number) => (v * Math.PI) / 180;
   const R = 6371;
@@ -186,6 +190,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [saveCard, setSaveCard]               = useState(false);
   const [pixData, setPixData]                 = useState<PixPaymentData | null>(null);
   const [pixCopied, setPixCopied]             = useState(false);
+  const [pixTimerNow, setPixTimerNow]         = useState(Date.now());
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
   const [feedbackCancelamento, setFeedbackCancelamento] = useState("");
   const [safrapayError, setSafrapayError]     = useState<string>("");
@@ -235,11 +240,22 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (!res.ok) throw new Error(data.error || "Erro ao processar pedido.");
       setFeedbackCancelamento(data.message || "Solicitacao registrada.");
     } catch (error) {
-      setFeedbackCancelamento(error instanceof Error ? error.message : "Erro ao processar pedido.");
+      const message = error instanceof TypeError
+        ? "Nao foi possivel conectar ao servidor de pedidos. Publique a versao atual no Firebase/Render e tente novamente."
+        : error instanceof Error
+          ? error.message
+          : "Erro ao processar pedido.";
+      setFeedbackCancelamento(message);
     } finally {
       setCancelandoPedido(false);
     }
   };
+
+  useEffect(() => {
+    if (!pixData?.expiresAt) return;
+    const id = window.setInterval(() => setPixTimerNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [pixData?.expiresAt]);
 
   useEffect(() => {
     try {
@@ -466,10 +482,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         purchaseStatus = "PurchaseStatus.waitingForOrderPayment";
         paymentTransactionId = pixData.transactionId || "";
         paymentChargeId = pixData.chargeId || "";
-        paymentExpiresAt = pixData.expiresAt || "";
+        paymentExpiresAt = pixData.expiresAt || criarPixExpiresAt();
       } else if (payId === "pix" && safrapayConfig?.enabled) {
         paymentStatus = "waitingForPayment";
         purchaseStatus = "PurchaseStatus.waitingForOrderPayment";
+        paymentExpiresAt = criarPixExpiresAt();
       } else if (payId === "credito" && cardData) {
         // Validar se Safrapay está configurado
         if (!safrapayConfig || !safrapayConfig.enabled) {
@@ -603,7 +620,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           copyPasteKey: paymentData.copyPasteKey || "",
           transactionId: paymentData.transactionId,
           chargeId: paymentData.chargeId,
-          expiresAt: paymentData.expiresAt,
+          expiresAt: paymentData.expiresAt || criarPixExpiresAt(),
         };
 
         setPixData(pixPaymentData);
@@ -683,6 +700,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const addrSelecionado = addresses.find((a) => a.id === selectedAddressId);
   const safraDocumentRequired = requiresSafrapayDocument(metodoPagamento, safrapayConfig);
+  const pixExpiresAtMs = pixData?.expiresAt ? new Date(pixData.expiresAt).getTime() : 0;
+  const pixRemainingMs = pixExpiresAtMs ? Math.max(0, pixExpiresAtMs - pixTimerNow) : 0;
+  const pixRemainingLabel = pixExpiresAtMs
+    ? `${String(Math.floor(pixRemainingMs / 60000)).padStart(2, "0")}:${String(Math.floor((pixRemainingMs % 60000) / 1000)).padStart(2, "0")}`
+    : "";
+  const pixExpired = Boolean(pixExpiresAtMs && pixRemainingMs <= 0);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // TELA DE SUCESSO
@@ -703,6 +726,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <p className={styles.pixSuccessText}>
                 Escaneie o QR Code ou copie o código Pix para pagar no app do seu banco.
               </p>
+              {pixRemainingLabel && (
+                <p className={`${styles.pixTimer} ${pixExpired ? styles.pixTimerExpired : ""}`}>
+                  {pixExpired ? "Pix expirado" : `Tempo para pagar: ${pixRemainingLabel}`}
+                </p>
+              )}
               {pixData.qrCodeUrl && (
                 <img
                   src={pixData.qrCodeUrl}

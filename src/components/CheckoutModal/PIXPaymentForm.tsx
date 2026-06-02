@@ -177,7 +177,7 @@ export const PIXPaymentForm: React.FC<PIXPaymentFormProps> = ({
           <strong>Beneficiario:</strong> {nomeCliente}
         </p>
         <p className={styles.infoHint}>
-          Este QR Code expira em 10 minutos. O pagamento sera confirmado automaticamente.
+          Este QR Code expira em 30 minutos. O pagamento sera confirmado automaticamente.
         </p>
       </div>
     </div>
