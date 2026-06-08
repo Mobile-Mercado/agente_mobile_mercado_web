@@ -163,6 +163,8 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
 
     try {
       await confirmationResult.confirm(verificationCode);
+      setConfirmationResult(null);
+      clearRecaptcha();
       setIsVerificationModalOpen(false);
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code;
@@ -257,7 +259,20 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
 
   return (
     <div className={styles.login}>
-      <div id="recaptcha-container" style={{ position: "fixed", top: 0, right: 0, zIndex: 9999, transform: "scale(0.7)", transformOrigin: "top right", pointerEvents: "none" }}></div>
+      <div
+        id="recaptcha-container"
+        style={{
+          position: "fixed",
+          right: 0,
+          bottom: 0,
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          opacity: 0,
+          zIndex: 9999,
+          pointerEvents: "none",
+        }}
+      />
 
       {/* Header simples com logo */}
       <div className={styles.loginHeader}>

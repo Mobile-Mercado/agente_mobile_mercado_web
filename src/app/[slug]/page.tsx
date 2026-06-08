@@ -1082,6 +1082,9 @@ const AgentePage: React.FC = () => {
     setAuthCodeError('');
     try {
       await authConfirmation.confirm(authCode);
+      setAuthConfirmation(null);
+      clearRecaptchaAuth();
+      setRecaptchaVisivel(false);
       setLoginCompleto(true); // Esconde auth imediatamente, antes do onAuthStateChanged disparar
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
@@ -2987,14 +2990,18 @@ const AgentePage: React.FC = () => {
         id="recaptcha-container"
         style={{
           position: 'fixed',
-          left: '50%',
-          bottom: 18,
+          right: 12,
+          bottom: recaptchaVisivel ? 'calc(92px + env(safe-area-inset-bottom, 0px))' : 'calc(76px + env(safe-area-inset-bottom, 0px))',
           zIndex: 9999,
-          transform: recaptchaVisivel ? 'translateX(-50%)' : 'translateX(-50%) scale(0.7)',
-          transformOrigin: 'bottom center',
+          width: recaptchaVisivel ? 'min(304px, calc(100vw - 24px))' : 260,
+          minHeight: recaptchaVisivel ? 78 : 60,
+          overflow: 'visible',
+          opacity: recaptchaVisivel ? 1 : 0,
+          transform: recaptchaVisivel ? 'scale(0.92)' : 'scale(0.7)',
+          transformOrigin: 'bottom right',
           background: recaptchaVisivel ? '#fff' : 'transparent',
-          borderRadius: recaptchaVisivel ? 8 : 0,
-          boxShadow: recaptchaVisivel ? '0 10px 30px rgba(0,0,0,0.22)' : 'none',
+          borderRadius: recaptchaVisivel ? 10 : 0,
+          boxShadow: recaptchaVisivel ? '0 10px 28px rgba(15,23,42,0.24)' : 'none',
           padding: recaptchaVisivel ? 10 : 0,
           pointerEvents: recaptchaVisivel ? 'auto' : 'none',
         }}

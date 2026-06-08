@@ -172,6 +172,8 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
     setCodeError("");
     try {
       await confirmation.confirm(code);
+      setConfirmation(null);
+      clearRecaptcha();
       // onAuthStateChanged em page.tsx detecta o login e continua o fluxo
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
@@ -192,7 +194,20 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
 
   return (
     <>
-      <div id="recaptcha-inline" style={{ position: 'fixed', top: 0, right: 0, zIndex: 9999, transform: 'scale(0.7)', transformOrigin: 'top right', pointerEvents: 'none' }} />
+      <div
+        id="recaptcha-inline"
+        style={{
+          position: 'fixed',
+          right: 0,
+          bottom: 0,
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          opacity: 0,
+          zIndex: 9999,
+          pointerEvents: 'none',
+        }}
+      />
     <div className={styles.wrapper}>
 
       {/* Área de mensagens — ocupa espaço abaixo do Header da loja */}
