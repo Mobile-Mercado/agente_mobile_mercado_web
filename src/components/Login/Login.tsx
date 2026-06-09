@@ -19,7 +19,9 @@ import { X } from "lucide-react";
 
 declare global {
   interface Window {
+    grecaptcha?: { reset: (widgetId?: number) => void };
     recaptchaVerifier?: RecaptchaVerifier;
+    recaptchaWidgetId?: number;
   }
 }
 
@@ -61,6 +63,10 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
   };
 
   const clearRecaptcha = () => {
+    if (window.grecaptcha && typeof window.recaptchaWidgetId === "number") {
+      try { window.grecaptcha.reset(window.recaptchaWidgetId); } catch {}
+      window.recaptchaWidgetId = undefined;
+    }
     if (window.recaptchaVerifier) {
       try { window.recaptchaVerifier.clear(); } catch {}
       window.recaptchaVerifier = undefined;
@@ -90,7 +96,7 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
       },
     });
 
-    await verifier.render();
+    window.recaptchaWidgetId = await verifier.render();
     window.recaptchaVerifier = verifier;
     return verifier;
   };

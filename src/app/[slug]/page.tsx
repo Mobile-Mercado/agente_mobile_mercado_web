@@ -101,6 +101,13 @@ import {
 } from "@/services/firestore";
 import { Timestamp } from "firebase/firestore";
 
+declare global {
+  interface Window {
+    grecaptcha?: { reset: (widgetId?: number) => void };
+    recaptchaVerifier?: RecaptchaVerifier;
+    recaptchaWidgetId?: number;
+  }
+}
 
 // ============================================================
 // FLUXO LOCAL: LISTA COM QUANTIDADES
@@ -929,6 +936,10 @@ const AgentePage: React.FC = () => {
   };
 
   const clearRecaptchaAuth = () => {
+    if (window.grecaptcha && typeof window.recaptchaWidgetId === 'number') {
+      try { window.grecaptcha.reset(window.recaptchaWidgetId); } catch {}
+      window.recaptchaWidgetId = undefined;
+    }
     if (window.recaptchaVerifier) {
       try { window.recaptchaVerifier.clear(); } catch {}
       window.recaptchaVerifier = undefined;
@@ -964,7 +975,7 @@ const AgentePage: React.FC = () => {
         setRecaptchaVisivel(false);
       },
     });
-    await verifier.render();
+    window.recaptchaWidgetId = await verifier.render();
     window.recaptchaVerifier = verifier;
     recaptchaAuthRef.current = verifier;
     return verifier;

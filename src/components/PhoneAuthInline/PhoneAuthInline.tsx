@@ -15,7 +15,9 @@ import styles from "./PhoneAuthInline.module.css";
 
 declare global {
   interface Window {
+    grecaptcha?: { reset: (widgetId?: number) => void };
     recaptchaVerifierInline?: RecaptchaVerifier;
+    recaptchaWidgetIdInline?: number;
   }
 }
 
@@ -77,6 +79,10 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
   };
 
   const clearRecaptcha = () => {
+    if (window.grecaptcha && typeof window.recaptchaWidgetIdInline === "number") {
+      try { window.grecaptcha.reset(window.recaptchaWidgetIdInline); } catch {}
+      window.recaptchaWidgetIdInline = undefined;
+    }
     if (window.recaptchaVerifierInline) {
       try { window.recaptchaVerifierInline.clear(); } catch {}
       window.recaptchaVerifierInline = undefined;
@@ -101,7 +107,7 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
         clearRecaptcha();
       },
     });
-    await verifier.render();
+    window.recaptchaWidgetIdInline = await verifier.render();
     window.recaptchaVerifierInline = verifier;
     return verifier;
   };
