@@ -263,12 +263,14 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
         id="recaptcha-container"
         style={{
           position: "fixed",
-          right: 0,
-          bottom: 0,
-          width: 1,
-          height: 1,
-          overflow: "hidden",
-          opacity: 0,
+          right: 12,
+          bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
+          width: 260,
+          minHeight: 60,
+          overflow: "visible",
+          opacity: 1,
+          transform: "scale(0.7)",
+          transformOrigin: "bottom right",
           zIndex: 9999,
           pointerEvents: "none",
         }}

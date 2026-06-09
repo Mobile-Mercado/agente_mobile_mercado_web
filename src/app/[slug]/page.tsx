@@ -2996,7 +2996,7 @@ const AgentePage: React.FC = () => {
           width: recaptchaVisivel ? 'min(304px, calc(100vw - 24px))' : 260,
           minHeight: recaptchaVisivel ? 78 : 60,
           overflow: 'visible',
-          opacity: recaptchaVisivel ? 1 : 0,
+          opacity: 1,
           transform: recaptchaVisivel ? 'scale(0.92)' : 'scale(0.7)',
           transformOrigin: 'bottom right',
           background: recaptchaVisivel ? '#fff' : 'transparent',
