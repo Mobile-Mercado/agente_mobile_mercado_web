@@ -38,4 +38,9 @@ export function getAdminDb(): admin.firestore.Firestore | null {
   return app ? admin.firestore(app) : null;
 }
 
+export function getAdminAuth(): admin.auth.Auth | null {
+  const app = initializeAdminApp();
+  return app ? admin.auth(app) : null;
+}
+
 export { admin };

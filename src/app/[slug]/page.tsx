@@ -2,7 +2,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { onAuthStateChanged, signInAnonymously, signOut, signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult, setPersistence, browserLocalPersistence, browserSessionPersistence, User } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously, signOut, signInWithPhoneNumber, signInWithCustomToken, RecaptchaVerifier, ConfirmationResult, setPersistence, browserLocalPersistence, browserSessionPersistence, User } from "firebase/auth";
 import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { Send, Loader2, ShoppingCart, X, ZoomIn, QrCode, Banknote, CreditCard, Plus, Minus, Mic } from "lucide-react";
 import Image from "next/image";
@@ -1142,18 +1142,51 @@ const AgentePage: React.FC = () => {
         'auth/operation-not-allowed': 'Login por telefone não está habilitado no Firebase Auth.',
       };
       const msgErro = errMsgs[err.code ?? ''] ?? 'Não foi possível enviar o SMS. Tente novamente.';
+      const permiteCodigoInterno = err.code !== 'auth/invalid-phone-number';
       setMensagens(prev => [
-        ...prev.filter(m => !['auth-validating', 'auth-phone-error', 'auth-recaptcha-visible'].includes(m.id)),
+        ...prev.filter(m => !['auth-validating', 'auth-phone-error', 'auth-recaptcha-visible', 'auth-code-card'].includes(m.id)),
         { id: 'auth-phone-error', role: 'assistant', content: msgErro, timestamp: new Date() },
+        ...(permiteCodigoInterno ? [
+          {
+            id: `auth-code-sent-${Date.now()}`,
+            role: 'assistant' as const,
+            content: 'Se você possui o código interno do sistema, digite os 6 dígitos no campo abaixo para entrar com este telefone.',
+            timestamp: new Date(),
+          },
+          {
+            id: 'auth-code-card',
+            role: 'assistant' as const,
+            content: '',
+            authCheckboxCard: true,
+            timestamp: new Date(),
+          },
+        ] : []),
       ]);
-      setAuthStep(isResend && authConfirmation ? 'code_modal' : 'phone');
+      setAuthStep(permiteCodigoInterno || (isResend && authConfirmation) ? 'code_modal' : 'phone');
       clearRecaptchaAuth();
       setRecaptchaVisivel(false);
     } finally { setAuthSending(false); }
   };
 
+  const signInWithPhoneFallbackCode = async () => {
+    const res = await fetch('/api/auth/phone-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: authPhone, code: authCode }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.token) {
+      const error = new Error(data.error ?? 'phone-code-fallback-failed') as Error & { code?: string };
+      error.code = data.error ?? 'phone-code-fallback-failed';
+      throw error;
+    }
+
+    await signInWithCustomToken(auth, data.token);
+  };
+
   const handleAuthVerifyCode = async () => {
-    if (!authConfirmation || authCode.length !== 6) return;
+    if (authCode.length !== 6) return;
     if (!authAcceptTerms) {
       setMensagens(prev => [
         ...prev.filter(m => m.id !== 'auth-code-error'),
@@ -1169,7 +1202,19 @@ const AgentePage: React.FC = () => {
     setAuthSending(true);
     setAuthCodeError('');
     try {
-      await authConfirmation.confirm(authCode);
+      if (authConfirmation) {
+        try {
+          await authConfirmation.confirm(authCode);
+        } catch (smsError: unknown) {
+          const err = smsError as { code?: string };
+          if (!['auth/invalid-verification-code', 'auth/code-expired', 'auth/session-expired'].includes(err.code ?? '')) {
+            throw smsError;
+          }
+          await signInWithPhoneFallbackCode();
+        }
+      } else {
+        await signInWithPhoneFallbackCode();
+      }
       setAuthConfirmation(null);
       clearRecaptchaAuth();
       setRecaptchaVisivel(false);
@@ -1181,6 +1226,10 @@ const AgentePage: React.FC = () => {
         'auth/invalid-verification-code': 'Código incorreto. Verifique o SMS.',
         'auth/code-expired': 'Código expirado. Clique em reenviar.',
         'auth/session-expired': 'Sessão expirada. Solicite um novo código.',
+        'fallback-disabled': 'Código interno não configurado neste ambiente.',
+        'invalid-code': 'Código incorreto. Verifique o código recebido ou o código interno configurado.',
+        'invalid-phone': 'Número inválido. Confira o telefone informado.',
+        'firebase-admin-unavailable': 'Login interno indisponível neste servidor.',
       };
       setMensagens(prev => [
         ...prev.filter(m => m.id !== 'auth-code-error'),
@@ -3639,7 +3688,7 @@ const AgentePage: React.FC = () => {
             type={authStep !== 'code_modal' ? "tel" : "text"}
             inputMode={authStep === 'code_modal' ? "numeric" : undefined}
             maxLength={authStep === 'code_modal' ? 6 : undefined}
-            placeholder={authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : authStep === 'code_modal' ? "000000" : "(11) 99999-9999"}
+            placeholder={authStep === 'code_modal' ? "000000" : authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "(11) 99999-9999"}
             className={styles.messageInput}
             style={authStep === 'code_modal' ? { letterSpacing: '0.4em', textAlign: 'center', fontSize: '1.1rem', fontWeight: 700 } : undefined}
             value={authStep === 'code_modal' ? authCode : authPhone}

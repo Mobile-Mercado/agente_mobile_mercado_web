@@ -14,6 +14,8 @@ runConfig:
 # - SAFRAPAY_MOBILE_API_URL=https://safrapi--appmobileprod-19505.us-east4.hosted.app/
 # Optional runtime vars:
 # - SAFRAPAY_WEBHOOK_SECRET
+# - PHONE_AUTH_FALLBACK_ENABLED=false
+# - PHONE_AUTH_FALLBACK_CODE=
 # - VAPID_PUBLIC_KEY
 # - VAPID_PRIVATE_KEY
 # - VAPID_SUBJECT
