@@ -14,6 +14,7 @@ import InfoBar from "@/components/Chat/InfoBar";
 import AuthCheckboxCard from "@/components/Chat/AuthCheckboxCard";
 import CheckoutModal from "@/components/CheckoutModal/CheckoutModal";
 import { validatePhone } from "@/lib/validation";
+import { requestSmsSendPermission, smsAuthGuardMessage } from "@/lib/smsAuthGuard";
 import { useEstabelecimento } from "@/hooks/useEstabelecimento";
 import {
   normalizar,
@@ -1103,6 +1104,18 @@ const AgentePage: React.FC = () => {
           content: `Aguarde ${segundos < 60 ? `${segundos}s` : authSmsCooldownLabel || '01 min'} antes de solicitar outro codigo.`,
           timestamp: new Date(),
         },
+      ]);
+      setAuthStep(options?.resend && authConfirmation ? 'code_modal' : 'phone');
+      return;
+    }
+    const guardResult = await requestSmsSendPermission(formatted);
+    if (!guardResult.ok) {
+      if (guardResult.reason === 'cooldown') {
+        startAuthSendCooldown(formatted, guardResult.retryAfterMs);
+      }
+      setMensagens(prev => [
+        ...prev.filter(m => !['auth-validating', 'auth-phone-error'].includes(m.id)),
+        { id: 'auth-phone-error', role: 'assistant', content: smsAuthGuardMessage(guardResult), timestamp: new Date() },
       ]);
       setAuthStep(options?.resend && authConfirmation ? 'code_modal' : 'phone');
       return;

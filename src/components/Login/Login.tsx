@@ -15,6 +15,7 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { auth, googleProvider, appleProvider } from '@/lib/firebase';
+import { requestSmsSendPermission, smsAuthGuardMessage } from '@/lib/smsAuthGuard';
 import { X } from "lucide-react";
 
 declare global {
@@ -144,6 +145,15 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
       if (cooldownUntil > Date.now()) {
         const seconds = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
         setError(`Aguarde ${seconds}s antes de solicitar outro código.`);
+        return;
+      }
+
+      const guardResult = await requestSmsSendPermission(formattedPhone);
+      if (!guardResult.ok) {
+        if (guardResult.reason === 'cooldown') {
+          startCooldown(formattedPhone, guardResult.retryAfterMs);
+        }
+        setError(smsAuthGuardMessage(guardResult));
         return;
       }
 
