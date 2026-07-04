@@ -1088,6 +1088,21 @@ const AgentePage: React.FC = () => {
         return;
       }
 
+      // Uma sessao anonima residual (guest mode anterior, ou testes) fica salva no
+      // IndexedDB do navegador (browserLocalPersistence) e sobrevive a reloads. Ela nao
+      // aparece pra tela de login (isAnonymous conta como "sem login"), mas o Firebase
+      // usa esse estado de auth existente ao montar a chamada de sendVerificationCode,
+      // e isso e o que fazia o pedido de SMS ser recusado (400) so em abas com sessao
+      // antiga - em aba anonima, sem essa sessao, funcionava normalmente. Encerrando
+      // a sessao residual antes de comecar, garantimos o mesmo estado limpo de uma
+      // aba anonima sem depender do usuario limpar cache manualmente.
+      if (auth.currentUser?.isAnonymous) {
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          console.warn('[PhoneAuth] Nao foi possivel encerrar sessao anonima residual; continuando mesmo assim.', signOutError);
+        }
+      }
       try {
         await setPersistence(auth, authKeepLogged ? browserLocalPersistence : browserSessionPersistence);
       } catch (persistenceError) {
