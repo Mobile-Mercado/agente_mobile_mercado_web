@@ -225,6 +225,11 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
       <div
         id="recaptcha-inline"
         style={{
+          // Sem transform aqui: o Google injeta o .grecaptcha-badge (position:fixed)
+          // dentro deste container, e um transform no container vira o "containing
+          // block" do badge, fazendo-o sumir da tela (mesma correcao aplicada em
+          // Login.tsx e [slug]/page.tsx). O tamanho/escala do selo vem do CSS global
+          // .grecaptcha-badge (globals.css).
           position: 'fixed',
           left: 8,                        // ← cola na esquerda
           bottom: 18,
@@ -232,8 +237,6 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
           minHeight: 60,
           overflow: 'visible',
           opacity: 1,
-          transform: 'scale(0.7)',        // ← sem translateX
-          transformOrigin: 'bottom left', // ← ancora no canto esquerdo
           zIndex: step === 'code_modal' ? -1 : 9999, // ← some atrás do modal
           pointerEvents: step === 'code_modal' ? 'none' : 'auto',
         }}

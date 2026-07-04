@@ -100,6 +100,7 @@ import {
   Pedido,
   registrarCapturaDadosAgente,
   registrarTempoRespostaAgente,
+  registrarBuscaAgente,
   type AgenteCaptureEventType,
 } from "@/services/firestore";
 import { Timestamp } from "firebase/firestore";
@@ -435,15 +436,8 @@ const AgentePage: React.FC = () => {
   const capturaVisitorIdRef = useRef<string>('');
   const capturaSessionIdRef = useRef<string>('');
   const capturaUserDocIdRef = useRef<string | null>(null);
-  const capturaCartRef = useRef<CartItem[]>([]);
   const capturaOrderCompletedRef = useRef(false);
   const capturaEnteredWithoutLoginRef = useRef(false);
-  const capturaLoggedInRef = useRef(false);
-  const capturaCartFilledRef = useRef(false);
-  const capturaShownProductsRef = useRef<Set<string>>(new Set());
-  const capturaPreviousCartRef = useRef<CartItem[]>([]);
-  const capturaCartCompareReadyRef = useRef(false);
-  const capturaLastCheckoutStartRef = useRef<string | null>(null);
   const isGuestMode = process.env.NEXT_PUBLIC_GUEST_MODE === 'true';
 
   const registrarCaptura = React.useCallback((
@@ -504,115 +498,28 @@ const AgentePage: React.FC = () => {
       path: window.location.pathname,
       visitCount,
     });
-
-    if (visitCount > 1) {
-      registrarCaptura('return_visit', `${sessionId}:return_visit`, {
-        visitCount,
-        returnCount: visitCount - 1,
-      });
-    }
-    if (visitCount === 2) {
-      registrarCaptura('return_second_visit', `${visitorId}:return_second_visit`, { visitCount });
-    }
-    if (visitCount === 10) {
-      registrarCaptura('return_tenth_visit', `${visitorId}:return_tenth_visit`, { visitCount });
-    }
-    if (visitCount === 31) {
-      registrarCaptura('return_more_than_30_visits', `${visitorId}:return_more_than_30_visits`, { visitCount });
-    }
   }, [companyId, rawSlug, registrarCaptura]);
 
   useEffect(() => {
     capturaUserDocIdRef.current = userDocId;
-    if (!userDocId || capturaLoggedInRef.current) return;
-    capturaLoggedInRef.current = true;
-    registrarCaptura('logged_in', `${capturaSessionIdRef.current}:logged_in`);
-  }, [registrarCaptura, userDocId]);
+  }, [userDocId]);
 
   useEffect(() => {
     if (authLoading || isGuestMode || capturaEnteredWithoutLoginRef.current) return;
     const needsLogin = !user || user.isAnonymous;
     if (!needsLogin) return;
+    // So marca que a tela de login foi exibida; o evento so e registrado
+    // se a pessoa sair sem concluir (ver registrarSaida abaixo).
     capturaEnteredWithoutLoginRef.current = true;
-    registrarCaptura('entered_without_login', `${capturaSessionIdRef.current}:entered_without_login`);
-  }, [authLoading, isGuestMode, registrarCaptura, user]);
-
-  useEffect(() => {
-    capturaCartRef.current = carrinho;
-
-    if (!capturaCartCompareReadyRef.current) {
-      capturaCartCompareReadyRef.current = true;
-      capturaPreviousCartRef.current = carrinho;
-    } else {
-      for (const item of carrinho) {
-        const anterior = capturaPreviousCartRef.current.find((prev) => prev.id === item.id);
-        const quantidadeAnterior = anterior?.quantity ?? 0;
-        if (item.quantity > quantidadeAnterior) {
-          registrarCaptura('product_added', `${capturaSessionIdRef.current}:product_added:${item.id}:${Date.now()}:${item.quantity}`, {
-            productId: item.id,
-            productName: item.name,
-            deltaQuantity: item.quantity - quantidadeAnterior,
-            quantity: item.quantity,
-            price: item.price,
-          });
-        }
-      }
-      capturaPreviousCartRef.current = carrinho;
-    }
-
-    if (carrinho.length === 0 || capturaCartFilledRef.current) return;
-    capturaCartFilledRef.current = true;
-    registrarCaptura('cart_filled', `${capturaSessionIdRef.current}:cart_filled`, {
-      itens: carrinho.length,
-      quantidadeTotal: carrinho.reduce((sum, item) => sum + item.quantity, 0),
-      total: carrinho.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    });
-  }, [carrinho, registrarCaptura]);
-
-  useEffect(() => {
-    for (const msg of mensagens) {
-      if (!msg.produtosCard || msg.produtosCard.length === 0) continue;
-      for (const produto of msg.produtosCard.slice(0, msg.maxProdutos ?? 6)) {
-        const eventKey = `${msg.id}:product_shown:${produto.id}`;
-        if (capturaShownProductsRef.current.has(eventKey)) continue;
-        capturaShownProductsRef.current.add(eventKey);
-        registrarCaptura('product_shown', eventKey, {
-          productId: produto.id,
-          productName: produto.name,
-          category: produto.category,
-          price: produto.price,
-          messageId: msg.id,
-          termoBusca: msg.termoBusca ?? null,
-        });
-      }
-    }
-  }, [mensagens, registrarCaptura]);
-
-  useEffect(() => {
-    if (!showCheckout || carrinho.length === 0) return;
-    const eventKey = `${capturaSessionIdRef.current}:checkout_started:${Date.now()}`;
-    capturaLastCheckoutStartRef.current = eventKey;
-    registrarCaptura('checkout_started', eventKey, {
-      itens: carrinho.length,
-      quantidadeTotal: carrinho.reduce((sum, item) => sum + item.quantity, 0),
-      total: carrinho.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    });
-  }, [carrinho, registrarCaptura, showCheckout]);
+  }, [authLoading, isGuestMode, user]);
 
   useEffect(() => {
     const registrarSaida = () => {
       if (capturaEnteredWithoutLoginRef.current && !capturaUserDocIdRef.current) {
-        registrarCaptura('left_without_login', `${capturaSessionIdRef.current}:left_without_login`);
+        registrarCaptura('login_failed', `${capturaSessionIdRef.current}:login_failed:abandoned`, {
+          reason: 'abandoned_login_screen',
+        });
       }
-
-      const cart = capturaCartRef.current;
-      if (cart.length === 0 || capturaOrderCompletedRef.current) return;
-
-      registrarCaptura('cart_not_completed', `${capturaSessionIdRef.current}:cart_not_completed`, {
-        itens: cart.length,
-        quantidadeTotal: cart.reduce((sum, item) => sum + item.quantity, 0),
-        total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-      });
     };
 
     const onVisibilityChange = () => {
@@ -1258,6 +1165,10 @@ const AgentePage: React.FC = () => {
       if (err.code === 'auth/too-many-requests') {
         startAuthSendCooldown(formatted, 10 * 60 * 1000);
       }
+      registrarCaptura('login_failed', `${capturaSessionIdRef.current}:login_failed:send:${Date.now()}`, {
+        reason: 'send_code_error',
+        errorCode: err.code ?? 'unknown',
+      });
       console.error(
         `[PhoneAuth] Erro ao enviar SMS code=${err.code ?? 'sem-code'} message=${err.message ?? 'sem-message'}`,
         e
@@ -1375,6 +1286,10 @@ const AgentePage: React.FC = () => {
       setLoginCompleto(true); // Esconde auth imediatamente, antes do onAuthStateChanged disparar
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
+      registrarCaptura('login_failed', `${capturaSessionIdRef.current}:login_failed:verify:${Date.now()}`, {
+        reason: 'verify_code_error',
+        errorCode: err.code ?? 'unknown',
+      });
       console.error('[PhoneAuth] Erro ao verificar código:', err.code, err.message, e);
       const msgs: Record<string, string> = {
         'auth/invalid-verification-code': 'Código incorreto. Verifique o SMS.',
@@ -1449,21 +1364,6 @@ const AgentePage: React.FC = () => {
       ]);
       setEnviando(false);
       return;
-    }
-
-    // ---- Pré-captura direta nos estados de coleta ----
-    // Garante que o dado seja salvo mesmo que o agente não emita a tag [SET_*].
-    const deveCapturarBusca =
-      wFlowState === FLOW_STATES.BROWSING &&
-      !ehSaudacaoCurta(texto) &&
-      !ehIntencaoCheckout(texto) &&
-      !ehAcaoContinuarComprando(texto) &&
-      !ehIntencaoSemProduto(texto);
-
-    if (deveCapturarBusca) {
-      registrarCaptura('search_performed', `${msgUsuario.id}:search_performed`, {
-        termo: texto,
-      });
     }
 
     const collectingField = COLLECTING_FIELD[wFlowState];
@@ -1638,28 +1538,6 @@ const AgentePage: React.FC = () => {
         suggestions?: string[],
         termoBusca?: string
       ) => {
-        const contentNormalizadoCaptura = normalizar(content);
-        if (
-          wFlowState === FLOW_STATES.BROWSING &&
-          !produtosCard?.length &&
-          (contentNormalizadoCaptura.includes("nao encontrei") ||
-            contentNormalizadoCaptura.includes("nao temos") ||
-            contentNormalizadoCaptura.includes("sem resultado"))
-        ) {
-          registrarCaptura('search_no_results', `${msgUsuario.id}:search_no_results:${normalizar(termoBusca ?? texto).slice(0, 80)}`, {
-            termo: termoBusca ?? texto,
-            resposta: content.slice(0, 240),
-          });
-        }
-
-        if (contentNormalizadoCaptura.includes("pedido minimo")) {
-          registrarCaptura('minimum_order_block', `${msgUsuario.id}:minimum_order_block`, {
-            totalCarrinho: wCart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-            itens: wCart.length,
-            pedidoMinimo: lojaConfig?.pedidoMinimo ?? 60,
-          });
-        }
-
         const contentFormatado = limparMarkdownBasico(content);
         setMensagens((prev) => [
           ...prev,
@@ -2760,13 +2638,17 @@ const AgentePage: React.FC = () => {
         }
       }
 
+      if (
+        wFlowState === FLOW_STATES.BROWSING &&
+        !ehSaudacaoCurta(texto) &&
+        !ehIntencaoCheckout(texto) &&
+        !ehAcaoContinuarComprando(texto) &&
+        !ehIntencaoSemProduto(texto)
+      ) {
+        registrarBuscaAgente(companyId, texto, produtosFoco.length > 0).catch(console.error);
+      }
+
       if (wFlowState === FLOW_STATES.BROWSING && produtosFoco.length === 0 && !ehSaudacaoCurta(texto) && !ehIntencaoSemProduto(texto)) {
-        if (deveCapturarBusca) {
-          registrarCaptura('search_no_results', `${msgUsuario.id}:search_no_results:${normalizar(texto).slice(0, 80)}`, {
-            termo: texto,
-            origem: 'product_discovery',
-          });
-        }
         const termoNorm = normalizar(texto).trim();
         const sr = semResultadoRef.current;
         if (sr.termo === termoNorm) {
@@ -3346,21 +3228,44 @@ const AgentePage: React.FC = () => {
       <div
         key={recaptchaContainerKey}
         id="recaptcha-container"
-        style={{
+        style={recaptchaVisivel ? {
+          // Modo visivel (checkbox do reCAPTCHA): o widget do Google e' renderizado
+          // em fluxo normal dentro deste container, entao um transform aqui e' seguro.
           position: 'fixed',
           left: '50%',
           bottom: 18,
           zIndex: 9999,
-          width: recaptchaVisivel ? 'min(304px, calc(100vw - 24px))' : 260,
-          minHeight: recaptchaVisivel ? 78 : 60,
+          width: 'min(304px, calc(100vw - 24px))',
+          minHeight: 78,
           overflow: 'visible',
           opacity: 1,
-          transform: recaptchaVisivel ? 'translateX(-50%) scale(0.92)' : 'translateX(-50%) scale(0.7)',
+          transform: 'translateX(-50%) scale(0.92)',
           transformOrigin: 'bottom center',
-          background: recaptchaVisivel ? '#fff' : 'transparent',
-          borderRadius: recaptchaVisivel ? 10 : 0,
-          boxShadow: recaptchaVisivel ? '0 10px 28px rgba(15,23,42,0.24)' : 'none',
-          padding: recaptchaVisivel ? 10 : 0,
+          background: '#fff',
+          borderRadius: 10,
+          boxShadow: '0 10px 28px rgba(15,23,42,0.24)',
+          padding: 10,
+          pointerEvents: 'auto',
+        } : {
+          // Modo invisivel (selo "protegido por reCAPTCHA"): o Google injeta o
+          // .grecaptcha-badge com position:fixed DENTRO deste container. Um transform
+          // aqui viraria o "containing block" do badge (regra do CSS: transform em um
+          // ancestral tira o position:fixed do fluxo do viewport), fazendo o selo herdar
+          // e somar a escala/posicao deste elemento e sumir da tela. Por isso a centralizacao
+          // usa calc() em vez de transform: translateX — a posicao final do selo em si
+          // e' controlada pela regra global .grecaptcha-badge em globals.css.
+          position: 'fixed',
+          left: 'calc(50% - 130px)',
+          bottom: 18,
+          zIndex: 9999,
+          width: 260,
+          minHeight: 60,
+          overflow: 'visible',
+          opacity: 1,
+          background: 'transparent',
+          borderRadius: 0,
+          boxShadow: 'none',
+          padding: 0,
           pointerEvents: 'auto',
         }}
       />
@@ -3541,11 +3446,6 @@ const AgentePage: React.FC = () => {
                   const minimo = lojaConfig?.pedidoMinimo ?? 60;
                   if (minimo > 0 && totalCarrinho < minimo) {
                     setMostrarCarrinho(false);
-                    registrarCaptura('minimum_order_block', `cart-sidebar-${Date.now()}:minimum_order_block`, {
-                      totalCarrinho,
-                      itens: carrinho.length,
-                      pedidoMinimo: minimo,
-                    });
                     const falta = (minimo - totalCarrinho).toFixed(2).replace('.', ',');
                     const minimoFmt = minimo.toFixed(2).replace('.', ',');
                     const msgId = `sys-${Date.now()}`;
@@ -3980,13 +3880,6 @@ const AgentePage: React.FC = () => {
           subtotal={totalCarrinho}
           taxaEntrega={DELIVERY_PRICE}
           onClose={() => {
-            if (!capturaOrderCompletedRef.current && carrinho.length > 0) {
-              registrarCaptura('checkout_abandoned', `${capturaLastCheckoutStartRef.current ?? capturaSessionIdRef.current}:checkout_abandoned`, {
-                itens: carrinho.length,
-                quantidadeTotal: carrinho.reduce((sum, item) => sum + item.quantity, 0),
-                total: carrinho.reduce((sum, item) => sum + item.price * item.quantity, 0),
-              });
-            }
             setShowCheckout(false);
           }}
           onSuccess={(orderNumber, total, pixCopyPasteKey, orderId) => {
@@ -4011,13 +3904,6 @@ const AgentePage: React.FC = () => {
               timestamp: new Date(),
               suggestions: ["Continuar comprando"],
             }]);
-          }}
-          onPaymentError={(error, paymentMethod) => {
-            registrarCaptura('payment_error', `${capturaSessionIdRef.current}:payment_error:${paymentMethod ?? 'unknown'}:${normalizar(error).slice(0, 120)}`, {
-              error,
-              paymentMethod,
-              total: totalCarrinho,
-            });
           }}
         />
       )}

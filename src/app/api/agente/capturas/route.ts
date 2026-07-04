@@ -7,26 +7,9 @@ export const runtime = "nodejs";
 
 const CAPTURE_COUNTER_FIELD: Record<AgenteCaptureEventType, string> = {
   site_visit: "totalVisitas",
-  entered_without_login: "usuariosEntraramSemLogar",
-  left_without_login: "usuariosEntraramESairamSemLogar",
-  logged_in: "usuariosEntraramELogaram",
-  cart_filled: "usuariosPreencheramCarrinho",
-  cart_not_completed: "usuariosComCarrinhoSemPedido",
-  return_visit: "totalRetornosUsuarios",
-  return_second_visit: "usuariosVoltaramSegundaVez",
-  return_tenth_visit: "usuariosVoltaramDecimaVez",
-  return_more_than_30_visits: "usuariosVoltaramMaisDe30Vezes",
-  search_performed: "buscasRealizadas",
-  search_no_results: "buscasSemResultado",
-  product_shown: "produtosExibidos",
-  product_added: "produtosAdicionados",
-  checkout_started: "checkoutsIniciados",
-  checkout_abandoned: "checkoutsAbandonados",
+  login_failed: "usuariosNaoConseguiramLogar",
   order_completed: "pedidosConcluidos",
   order_canceled: "pedidosCancelados",
-  payment_error: "errosPagamento",
-  minimum_order_block: "bloqueiosPedidoMinimo",
-  feedback_submitted: "feedbacksRecebidos",
 };
 
 const GERENCIADOR_PLUS_STATS_COUNTERS: Partial<Record<AgenteCaptureEventType, string[]>> = {
@@ -256,6 +239,44 @@ export async function POST(request: NextRequest) {
         });
 
       return NextResponse.json({ success: true, id: ref.id });
+    }
+
+    if (body?.kind === "search") {
+      const search = body.search && typeof body.search === "object"
+        ? body.search as Record<string, unknown>
+        : null;
+
+      if (!search || typeof search.companyId !== "string" || typeof search.termo !== "string") {
+        return NextResponse.json({ error: "Busca invalida" }, { status: 400 });
+      }
+
+      const companyId = search.companyId.slice(0, 200);
+      const termoOriginal = search.termo.trim().slice(0, 120);
+      const termoId = termoOriginal
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120) || "termo";
+      const houveResultado = Boolean(search.houveResultado);
+
+      await db
+        .collection("AgenteVendas")
+        .doc(companyId)
+        .collection("termosBuscados")
+        .doc(termoId)
+        .set(
+          {
+            termo: termoOriginal,
+            totalBuscas: admin.firestore.FieldValue.increment(1),
+            semResultado: admin.firestore.FieldValue.increment(houveResultado ? 0 : 1),
+            ultimaBuscaEm: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });

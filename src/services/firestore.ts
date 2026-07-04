@@ -31,26 +31,9 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 export type AgenteCaptureEventType =
   | 'site_visit'
-  | 'entered_without_login'
-  | 'left_without_login'
-  | 'logged_in'
-  | 'cart_filled'
-  | 'cart_not_completed'
-  | 'return_visit'
-  | 'return_second_visit'
-  | 'return_tenth_visit'
-  | 'return_more_than_30_visits'
-  | 'search_performed'
-  | 'search_no_results'
-  | 'product_shown'
-  | 'product_added'
-  | 'checkout_started'
-  | 'checkout_abandoned'
+  | 'login_failed'
   | 'order_completed'
-  | 'order_canceled'
-  | 'payment_error'
-  | 'minimum_order_block'
-  | 'feedback_submitted';
+  | 'order_canceled';
 
 export interface AgenteCaptureEvent {
   eventId: string;
@@ -74,6 +57,32 @@ export async function registrarCapturaDadosAgente(
 
   if (!res.ok) {
     console.warn(`Erro ao registrar captura: ${res.status}`);
+  }
+}
+
+// Agrega buscas por termo em AgenteVendas/{companyId}/termosBuscados/{termoId},
+// consumido pela tela "Inteligencia de Buscas" do gerenciador.
+export async function registrarBuscaAgente(
+  companyId: string,
+  termo: string,
+  houveResultado: boolean
+): Promise<void> {
+  const termoLimpo = termo.trim();
+  if (!termoLimpo) return;
+
+  try {
+    const res = await fetch('/api/agente/capturas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'search', search: { companyId, termo: termoLimpo, houveResultado } }),
+      keepalive: true,
+    });
+
+    if (!res.ok) {
+      console.warn(`Erro ao registrar busca: ${res.status}`);
+    }
+  } catch (error) {
+    console.warn('Erro ao registrar busca:', error);
   }
 }
 
@@ -121,20 +130,6 @@ export async function salvarNotaFeedbackAgente(dados: {
   if (!res.ok) {
     throw new Error(`Erro ao salvar feedback: ${res.status}`);
   }
-
-  await registrarCapturaDadosAgente({
-    eventId: `${dados.companyId}:${dados.sessionId}:feedback_submitted:${Date.now()}`,
-    eventType: 'feedback_submitted',
-    companyId: dados.companyId,
-    visitorId: dados.visitorId,
-    sessionId: dados.sessionId,
-    userDocId: dados.userDocId ?? null,
-    metadata: {
-      nota: dados.nota ?? null,
-      conversaId: dados.conversaId ?? null,
-      hasFeedbackText: Boolean(dados.feedback?.trim()),
-    },
-  });
 
   const data = await res.json() as { id?: string };
   return data.id ?? '';
