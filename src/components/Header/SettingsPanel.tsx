@@ -281,9 +281,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className={styles.orderEmpty}>Nenhum pedido encontrado nesta conta.</div>
                   ) : (
                     <div className={styles.orderList}>
-                      {pedidos.map((pedido) => {
+                      {pedidos.map((pedido, index) => {
                         const buttonLabel = acaoPedido(pedido);
                         const qrSrc = pedido.paymentPixQrCodeUrl || pedido.paymentPixQrCode || "";
+                        // A lista vem ordenada do mais recente pro mais antigo (orderBy createdAt desc
+                        // em buscarPedidosDoUsuario). O campo paymentPixCopyPasteKey fica salvo no pedido
+                        // mesmo depois de pago, entao sem essa checagem o codigo PIX de pedidos antigos
+                        // reaparecia junto com os outros. Só o pedido mais recente deve mostrar o PIX.
+                        const isPedidoMaisRecente = index === 0;
                         return (
                           <div className={styles.orderCard} key={pedido.id}>
                             <div className={styles.orderTop}>
@@ -302,7 +307,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 <span key={`${pedido.id}-${idx}`}>{item.quantity}x {item.product?.name ?? "Produto"}</span>
                               ))}
                             </div>
-                            {pedido.paymentPixCopyPasteKey && (
+                            {isPedidoMaisRecente && pedido.paymentPixCopyPasteKey && (
                               <div className={styles.pixBox}>
                                 {qrSrc && <img src={qrSrc} alt="QR Code Pix" className={styles.pixImage} />}
                                 <textarea className={styles.pixTextarea} value={pedido.paymentPixCopyPasteKey} readOnly />
