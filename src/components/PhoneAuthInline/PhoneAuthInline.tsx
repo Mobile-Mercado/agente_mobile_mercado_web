@@ -47,6 +47,10 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
   const [visibleMessages, setVisibleMessages] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const sendInFlightRef = useRef(false);
+  
+  // ✅ FIX: Adicionar timeout para liberar sendInFlightRef em caso de erro de conexão
+  const sendTimeoutRef = useRef<NodeJS.Timeout>();
+  
   const SEND_CODE_COOLDOWN_MS = 60 * 1000;
   const cooldownStorageKey = (phoneNumber: string) => `inline_sms_cooldown:${phoneNumber}`;
   const readCooldownUntil = (phoneNumber: string) => {
@@ -78,6 +82,8 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
   useEffect(() => {
     return () => {
       clearRecaptcha();
+      // ✅ FIX: Limpar timeout pendente
+      if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
     };
   }, []);
 
@@ -103,8 +109,9 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
   };
 
   const setupRecaptcha = async (): Promise<RecaptchaVerifier> => {
-    // Sempre recria o verifier — verifiers cacheados entram em estado inválido no mobile.
-    console.count("[reCAPTCHA] setupRecaptcha chamado"); // ← linha adicionada
+    // ✅ FIX: Sempre recriar o verifier para evitar estado sujo
+    // Verifiers cacheados entram em estado inválido no mobile após erro
+    console.count("[reCAPTCHA] setupRecaptcha chamado");
     clearRecaptcha();
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -116,6 +123,7 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
       size: "invisible",
       callback: () => { },
       "expired-callback": () => {
+        console.warn("[reCAPTCHA] Widget expirou, será recriado na próxima tentativa");
         clearRecaptcha();
       },
     });
@@ -155,17 +163,35 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
       setPhoneError("Número inválido. Use o formato: (11) 99999-9999");
       return;
     }
-    if (sendInFlightRef.current) return;
+    
+    // ✅ FIX: Verificar se há requisição em andamento
+    if (sendInFlightRef.current) {
+      console.warn("[PhoneAuth] Requisição já em andamento, ignorando");
+      return;
+    }
+    
     const cooldownUntil = readCooldownUntil(formatted);
     if (cooldownUntil > Date.now()) {
       const seconds = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
       setPhoneError(`Aguarde ${seconds}s antes de solicitar outro código.`);
       return;
     }
+    
     sendInFlightRef.current = true;
     setPhoneError("");
     setLoading(true);
     setStep("validating");
+    
+    // ✅ FIX: Timeout de segurança para liberar a requisição após 30s
+    if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
+    sendTimeoutRef.current = setTimeout(() => {
+      console.error("[PhoneAuth] Timeout de 30s no envio de SMS, liberando flag");
+      sendInFlightRef.current = false;
+      setLoading(false);
+      setStep("phone");
+      setPhoneError("Timeout ao enviar SMS. Tente novamente.");
+    }, 30000);
+    
     try {
       const persistence = keepLogged ? browserLocalPersistence : browserSessionPersistence;
       try {
@@ -173,8 +199,12 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
       } catch (persistenceError) {
         console.warn("[PhoneAuth] Nao foi possivel ajustar persistencia; continuando com o padrao.", persistenceError);
       }
+      
       const verifier = await setupRecaptcha();
       const result = await signInWithPhoneNumber(auth, formatted, verifier);
+      
+      if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
+      
       startCooldown(formatted);
       setConfirmation(result);
       setStep("code_modal");
@@ -189,6 +219,7 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
       setStep("phone");
       clearRecaptcha();
     } finally {
+      if (sendTimeoutRef.current) clearTimeout(sendTimeoutRef.current);
       sendInFlightRef.current = false;
       setLoading(false);
     }
