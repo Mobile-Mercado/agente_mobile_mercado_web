@@ -1074,28 +1074,6 @@ const AgentePage: React.FC = () => {
         return;
       }
 
-      const fallbackStatus = await fetch('/api/auth/phone-code', { cache: 'no-store' })
-        .then((res) => res.ok ? res.json() : { enabled: false })
-        .catch(() => ({ enabled: false }));
-
-      if (fallbackStatus.enabled) {
-        setAuthConfirmation(null);
-        clearRecaptchaAuth();
-        setRecaptchaVisivel(false);
-        setMensagens(prev => [
-          ...prev.filter(m => !['auth-validating', 'auth-code-sent', 'auth-code-card', 'auth-recaptcha-visible'].includes(m.id)),
-          {
-            id: `auth-code-sent-${ts}`,
-            role: 'assistant',
-            content: `Digite o código interno de 6 dígitos para entrar com o telefone ${authPhone}.`,
-            timestamp: new Date(),
-          },
-          { id: 'auth-code-card', role: 'assistant', content: '', authCheckboxCard: true, timestamp: new Date() },
-        ]);
-        setAuthStep('code_modal');
-        return;
-      }
-
       if (authSmsCooldownMs > 0) {
         setMensagens(prev => [
           ...prev.filter(m => !['auth-validating', 'auth-phone-error'].includes(m.id)),
@@ -1194,54 +1172,17 @@ const AgentePage: React.FC = () => {
         'whatsapp-auth-disabled': 'Autenticação por WhatsApp não está ativa neste ambiente.',
       };
       const msgErro = errMsgs[err.code ?? ''] ?? 'Não foi possível enviar o código. Tente novamente.';
-      const permiteCodigoInterno = ![
-        'auth/invalid-phone-number',
-        'whatsapp-send-code-failed',
-        'whatsapp-auth-disabled',
-      ].includes(err.code ?? '');
       setMensagens(prev => [
         ...prev.filter(m => !['auth-validating', 'auth-phone-error', 'auth-recaptcha-visible', 'auth-code-card'].includes(m.id)),
         { id: 'auth-phone-error', role: 'assistant', content: msgErro, timestamp: new Date() },
-        ...(permiteCodigoInterno ? [
-          {
-            id: `auth-code-sent-${Date.now()}`,
-            role: 'assistant' as const,
-            content: 'Se você possui o código interno do sistema, digite os 6 dígitos no campo abaixo para entrar com este telefone.',
-            timestamp: new Date(),
-          },
-          {
-            id: 'auth-code-card',
-            role: 'assistant' as const,
-            content: '',
-            authCheckboxCard: true,
-            timestamp: new Date(),
-          },
-        ] : []),
       ]);
-      setAuthStep(permiteCodigoInterno || (isResend && authConfirmation) ? 'code_modal' : 'phone');
+      setAuthStep(isResend && authConfirmation ? 'code_modal' : 'phone');
       clearRecaptchaAuth();
       setRecaptchaVisivel(false);
     } finally {
       authSendInFlightRef.current = false;
       setAuthSending(false);
     }
-  };
-
-  const signInWithPhoneFallbackCode = async () => {
-    const res = await fetch('/api/auth/phone-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: authPhone, code: authCode }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.token) {
-      const error = new Error(data.error ?? 'phone-code-fallback-failed') as Error & { code?: string };
-      error.code = data.error ?? 'phone-code-fallback-failed';
-      throw error;
-    }
-
-    await signInWithCustomToken(auth, data.token);
   };
 
   const handleAuthVerifyCode = async () => {
@@ -1268,17 +1209,11 @@ const AgentePage: React.FC = () => {
       if (whatsappStatus.enabled) {
         await verifyWhatsappAuthCode();
       } else if (authConfirmation) {
-        try {
-          await authConfirmation.confirm(authCode);
-        } catch (smsError: unknown) {
-          const err = smsError as { code?: string };
-          if (!['auth/invalid-verification-code', 'auth/code-expired', 'auth/session-expired'].includes(err.code ?? '')) {
-            throw smsError;
-          }
-          await signInWithPhoneFallbackCode();
-        }
+        await authConfirmation.confirm(authCode);
       } else {
-        await signInWithPhoneFallbackCode();
+        const error = new Error('no-active-confirmation') as Error & { code?: string };
+        error.code = 'no-active-confirmation';
+        throw error;
       }
       setAuthConfirmation(null);
       clearRecaptchaAuth();
@@ -1295,10 +1230,7 @@ const AgentePage: React.FC = () => {
         'auth/invalid-verification-code': 'Código incorreto. Verifique o SMS.',
         'auth/code-expired': 'Código expirado. Clique em reenviar.',
         'auth/session-expired': 'Sessão expirada. Solicite um novo código.',
-        'fallback-disabled': 'Código interno não configurado neste ambiente.',
-        'invalid-code': 'Código incorreto. Verifique o código recebido ou o código interno configurado.',
-        'invalid-phone': 'Número inválido. Confira o telefone informado.',
-        'firebase-admin-unavailable': 'Login interno indisponível neste servidor.',
+        'no-active-confirmation': 'Sessão expirada. Clique em reenviar para receber um novo código.',
         'whatsapp-send-code-failed': 'Não foi possível enviar o código pelo WhatsApp. Tente novamente.',
         'whatsapp-verify-code-failed': 'Não foi possível validar o código do WhatsApp. Tente novamente.',
         'missing-firebase-custom-token': 'A API de WhatsApp validou o código, mas não retornou o token Firebase.',
