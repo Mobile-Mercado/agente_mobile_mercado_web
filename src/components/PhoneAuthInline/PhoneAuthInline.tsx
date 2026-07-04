@@ -49,7 +49,7 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
   const sendInFlightRef = useRef(false);
   
   // ✅ FIX: Adicionar timeout para liberar sendInFlightRef em caso de erro de conexão
-  const sendTimeoutRef = useRef<NodeJS.Timeout>();
+  const sendTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
   const SEND_CODE_COOLDOWN_MS = 60 * 1000;
   const cooldownStorageKey = (phoneNumber: string) => `inline_sms_cooldown:${phoneNumber}`;
