@@ -34,6 +34,16 @@ export function validatePhone(phone: string): string | null {
 }
 
 /**
+ * Valida e-mail simples
+ * Retorna o e-mail normalizado (trim + lowercase) ou null se inválido
+ */
+export function validateEmail(email: string): string | null {
+  const trimmed = email.trim().toLowerCase();
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(trimmed) ? trimmed : null;
+}
+
+/**
  * Valida CPF brasileiro com dígitos verificadores
  * Retorna true se o CPF é válido
  */

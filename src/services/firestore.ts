@@ -186,12 +186,13 @@ export async function criarOuObterUsuarioConvidado(): Promise<string> {
   return GUEST_USER_DOC_ID;
 }
 
-export async function criarUsuarioNovo(uid: string, telefone?: string): Promise<string> {
+export async function criarUsuarioNovo(uid: string, telefone?: string, email?: string): Promise<string> {
   const now = Timestamp.now();
   const ref = await addDoc(collection(db, 'Users'), {
     userAuthId: uid,
     nomeCompleto: '',
     telefone: telefone ?? '',
+    email: email ?? '',
     createAt: now,
     updateAt: now,
   });
@@ -455,7 +456,8 @@ export async function createOrder(
   cart: CartItem[],
   clientId: string,
   clienteNome: string = 'Cliente',
-  paymentProviderData?: PaymentProviderData
+  paymentProviderData?: PaymentProviderData,
+  conversaId?: string | null
 ): Promise<{ id: string; orderNumber: string; total: number }> {
   const now        = Timestamp.now();
   const cartTotal  = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -582,7 +584,7 @@ export async function createOrder(
     codeConfirmation:      '',
     documentInNote,
     review:                null,
-    chatReference:         null,
+    chatReference:         conversaId ?? null,
     schedulerRef:          null,
     createdAt:             now,
     updatedAt:             null,
@@ -741,6 +743,7 @@ export interface DadosConversa {
   customerDataColetado:    CustomerData;
   status:                  StatusConversa;
   origem:                  'agente_ia';
+  escalatedToChatId:       string | null;
 }
 
 export interface DadosMensagem {
@@ -794,6 +797,7 @@ export async function criarConversa(
       customerDataColetado:  {},
       status:                'ativa' as StatusConversa,
       origem:                'agente_ia',
+      escalatedToChatId:     null,
     } satisfies Omit<DadosConversa, 'conversaId'> & { conversaId: '' }
   );
 
@@ -858,12 +862,65 @@ export async function atualizarConversa(
     | 'pedidoOrderNumber'
     | 'pedidoTotal'
     | 'endedAt'
+    | 'escalatedToChatId'
   >>
 ): Promise<void> {
   await updateDoc(
     CONVERSA_DOC(userId, conversaId),
     { ...dados, updatedAt: Timestamp.now() }
   );
+}
+
+// ---- Handoff manual: encaminhar a conversa do Agente IA pra atendimento humano ----
+// Cria (ou reaproveita) um Chat real na mesma colecao Chats que o web_gerenciador_plus
+// le em Mensagens, posta uma mensagem de contexto, e marca a conversa do agente com o
+// id do chat gerado - sob demanda, sem tentar detectar automaticamente quando e necessario.
+async function findOrCreateChatId(companyId: string, userId: string, clienteNome: string): Promise<string> {
+  const chatsRef = collection(db, 'Chats');
+  const [asSender, asReceiver] = await Promise.all([
+    getDocs(query(chatsRef, where('senderId', '==', companyId), where('receiverId', '==', userId))),
+    getDocs(query(chatsRef, where('senderId', '==', userId), where('receiverId', '==', companyId))),
+  ]);
+  const existing = asSender.docs[0] || asReceiver.docs[0];
+  if (existing) return existing.id;
+
+  const newChat = await addDoc(chatsRef, {
+    senderId: companyId,
+    receiverId: userId,
+    receiverName: clienteNome,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    lastMessage: null,
+  });
+  return newChat.id;
+}
+
+export async function escalarParaAtendimentoHumano(
+  companyId: string,
+  userId: string,
+  conversaId: string,
+  clienteNome: string,
+  contextoResumo: string
+): Promise<string> {
+  const chatId = await findOrCreateChatId(companyId, userId, clienteNome);
+  const now = Timestamp.now();
+  const mensagemContexto = `🙋 ${clienteNome} pediu atendimento humano durante uma conversa com o Agente IA.\n\nResumo: ${contextoResumo}`;
+
+  await addDoc(collection(db, 'Chats', chatId, 'Messages'), {
+    mensage: mensagemContexto,
+    senderId: userId,
+    createdAt: now,
+    audioUrls: null,
+    filesUrls: null,
+  });
+  await updateDoc(doc(db, 'Chats', chatId), {
+    lastMessage: { mensage: mensagemContexto, senderId: userId, createdAt: now },
+    updatedAt: now,
+  });
+
+  await atualizarConversa(userId, conversaId, { escalatedToChatId: chatId });
+
+  return chatId;
 }
 
 export async function buscarConversaAtiva(

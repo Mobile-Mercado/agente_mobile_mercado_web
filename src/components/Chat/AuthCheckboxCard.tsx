@@ -9,6 +9,8 @@ interface AuthCheckboxCardProps {
   resendDisabled?: boolean;
   resendLabel?: string;
   onResend: () => void;
+  showEmailFallback?: boolean;
+  onEmailFallbackClick?: () => void;
 }
 
 const AuthCheckboxCard: React.FC<AuthCheckboxCardProps> = ({
@@ -20,6 +22,8 @@ const AuthCheckboxCard: React.FC<AuthCheckboxCardProps> = ({
   resendDisabled = false,
   resendLabel = "Reenviar código",
   onResend,
+  showEmailFallback = false,
+  onEmailFallbackClick,
 }) => {
   const isResendDisabled = authSending || resendDisabled;
 
@@ -76,6 +80,24 @@ const AuthCheckboxCard: React.FC<AuthCheckboxCardProps> = ({
       >
         {resendLabel}
       </button>
+
+      {showEmailFallback && onEmailFallbackClick && (
+        <button
+          onClick={onEmailFallbackClick}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#6b7280",
+            fontSize: "0.82rem",
+            cursor: "pointer",
+            textDecoration: "underline",
+            padding: 0,
+            textAlign: "left",
+          }}
+        >
+          Não recebeu o código? Entrar com e-mail e senha
+        </button>
+      )}
     </div>
   );
 };

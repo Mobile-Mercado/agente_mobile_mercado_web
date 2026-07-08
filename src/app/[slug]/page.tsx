@@ -2,8 +2,8 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { onAuthStateChanged, signInAnonymously, signOut, signInWithPhoneNumber, signInWithCustomToken, RecaptchaVerifier, ConfirmationResult, setPersistence, browserLocalPersistence, browserSessionPersistence, User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged, signInAnonymously, signOut, signInWithPhoneNumber, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, RecaptchaVerifier, ConfirmationResult, setPersistence, browserLocalPersistence, browserSessionPersistence, User } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { Send, Loader2, ShoppingCart, X, ZoomIn, QrCode, Banknote, CreditCard, Plus, Minus, Mic } from "lucide-react";
 import Image from "next/image";
 import styles from "../Agente/Agente.module.css";
@@ -12,10 +12,15 @@ import Header from "@/components/Header/Header";
 import WelcomeCard from "@/components/Chat/WelcomeCard";
 import InfoBar from "@/components/Chat/InfoBar";
 import AuthCheckboxCard from "@/components/Chat/AuthCheckboxCard";
+import EmailPasswordCard from "@/components/Chat/EmailPasswordCard";
 import CheckoutModal from "@/components/CheckoutModal/CheckoutModal";
-import { validatePhone } from "@/lib/validation";
+import { validatePhone, validateEmail } from "@/lib/validation";
 import { requestSmsSendPermission, smsAuthGuardMessage } from "@/lib/smsAuthGuard";
 import { useEstabelecimento } from "@/hooks/useEstabelecimento";
+import { useVoiceRecording } from "./hooks/useVoiceRecording";
+import { useTour } from "./hooks/useTour";
+import { useCaptureAnalytics } from "./hooks/useCaptureAnalytics";
+import { usePixPaymentWatcher } from "./hooks/usePixPaymentWatcher";
 import {
   normalizar,
   filtrarProdutos,
@@ -50,9 +55,6 @@ import {
   ehAcaoAlterarItem,
   ehConfirmacaoPositiva,
   ehCancelamento,
-  ehEscolhaAutomatica,
-  ehEscolhaVariacao,
-  encontrarIndiceEscolhido,
   extrairItensListaComQuantidade,
   extrairItensSimples,
   formatarResumoCarrinho,
@@ -84,6 +86,7 @@ import {
   criarConversa,
   salvarMensagem,
   atualizarConversa,
+  escalarParaAtendimentoHumano,
   buscarConversaAtiva,
   carregarExemplosAtivos,
   buscarEnderecoDefault,
@@ -98,149 +101,28 @@ import {
   DELIVERY_PRICE,
   buscarPedidosDoUsuario,
   Pedido,
-  registrarCapturaDadosAgente,
   registrarTempoRespostaAgente,
   registrarBuscaAgente,
-  type AgenteCaptureEventType,
 } from "@/services/firestore";
 import { Timestamp } from "firebase/firestore";
-
-declare global {
-  interface Window {
-    grecaptcha?: { reset: (widgetId?: number) => void };
-    recaptchaVerifier?: RecaptchaVerifier;
-    recaptchaWidgetId?: number;
-  }
-}
-
-// ============================================================
-// FLUXO LOCAL: LISTA COM QUANTIDADES
-// ============================================================
-type ListaFlowStage =
-  | "await_confirm"
-  | "await_mode"
-  | "selecting_variant"
-  | "await_next_item";
-
-interface ListaPedidoItem {
-  termoOriginal: string;
-  termoBusca: string;
-  quantidade: number;
-  candidatos: Produto[];
-  selecionadoId?: string;
-  cancelado?: boolean;
-}
-
-interface ListaPedidoState {
-  stage: ListaFlowStage;
-  itens: ListaPedidoItem[];
-  currentIndex: number;
-}
-
-interface ItemUnicoQuantidadeState {
-  termoBusca: string;
-  termoDisplay: string;
-  quantidade: number;
-  stage: "confirm_single" | "choose_other";
-  candidatos: Produto[];
-  produtoSugerido?: Produto;
-}
-
-interface CategoriaPaginadaState {
-  categoria: string;
-  produtosTodos: Produto[];  // todos os produtos da categoria (embaralhados)
-  paginaAtual: number;       // qual página estamos (0, 1, 2, ...)
-  ITENS_POR_PAGINA: number;  // sempre 6
-}
-
-// ============================================================
-// TIPOS
-// ============================================================
-interface Mensagem {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  produtosCard?: Produto[]; // cards de produto exibidos junto à mensagem
-  termoBusca?: string;      // termo usado para buscar esses produtos (para paginação)
-  maxProdutos?: number;     // quantos produtos estão visíveis (começa em 6, cresce +6 por clique)
-  suggestions?: string[];   // chips clicáveis gerados pelo [SUGGEST:...] do agente
-  authCheckboxCard?: boolean; // card especial com checkboxes de login
-  isWelcomeCard?: boolean;    // card de apresentação inicial estilizado
-  skeletonCardCount?: number; // quantidade de skeleton cards durante streaming
-}
-
-// Sequência para calcular progresso da barra
-const CHECKOUT_SEQUENCE: FlowState[] = [
-  FLOW_STATES.CHECKING_SAVED_ADDRESS,
-  FLOW_STATES.COLLECTING_STREET,
-  FLOW_STATES.COLLECTING_NUMBER,
-  FLOW_STATES.COLLECTING_NEIGHBORHOOD,
-  FLOW_STATES.COLLECTING_CITY,
-  FLOW_STATES.COLLECTING_STATE,
-  FLOW_STATES.COLLECTING_ZIPCODE,
-  FLOW_STATES.ASKING_SAVE_ADDRESS,
-  FLOW_STATES.COLLECTING_PAYMENT,
-  FLOW_STATES.COLLECTING_CARD_BRAND,
-  FLOW_STATES.COLLECTING_CHANGE,
-  FLOW_STATES.COLLECTING_CPF,
-  FLOW_STATES.CONFIRMING_ORDER,
-];
-
-const ESTADO_LABEL: Record<FlowState, string> = {
-  collecting_name:          "Nome",
-  browsing:                 "Navegando",
-  checking_saved_address:   "Endereço",
-  collecting_street:        "Rua",
-  collecting_number:        "Número",
-  collecting_neighborhood:  "Bairro",
-  collecting_city:          "Cidade",
-  collecting_state:         "Estado",
-  collecting_zipcode:       "CEP",
-  asking_save_address:      "Salvar endereço",
-  collecting_payment:       "Pagamento",
-  collecting_card_brand:    "Bandeira",
-  collecting_change:        "Troco",
-  collecting_cpf:                "CPF",
-  collecting_cpf_onboarding:     "CPF (cadastro)",
-  confirming_order:              "Confirmando pedido",
-};
-
-// ============================================================
-// TOUR ONBOARDING
-// ============================================================
-const TOUR_KEY = "agente_tour_visto";
-const chatHistoryKey = (slug: string, userId: string) => `chat_msgs_${slug}_${userId}`;
-const CHAT_HISTORY_MAX = 100;
-const CHAT_HISTORY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
-const TOUR_STEPS = [
-  {
-    emoji: "👋",
-    titulo: "Bem-vindo ao Assistente!",
-    desc: "Sou seu assistente de vendas inteligente. Posso ajudar a encontrar produtos, montar e finalizar seu pedido pelo chat.",
-  },
-  {
-    emoji: "🔍",
-    titulo: "Peça vários produtos de uma vez",
-    desc: `Digite algo como "quero 2 ovos, macarrão e um toddy" — eu encontro tudo, mostro os preços e adiciono ao carrinho.`,
-  },
-  {
-    emoji: "🛒",
-    titulo: "Acompanhe seu carrinho",
-    desc: "Toque no ícone do carrinho para ver os itens. O pedido é finalizado diretamente aqui no chat, sem sair da página.",
-  },
-  {
-    emoji: "💾",
-    titulo: "Conversa salva automaticamente",
-    desc: "Pode fechar o app e voltar depois — sua conversa fica salva. Use o ícone 🗑️ no topo para limpar e começar uma nova.",
-  },
-];
-
-function nomeEhPadraoDoSistema(nome: string | null | undefined): boolean {
-  const n = normalizar(String(nome ?? '')).trim();
-  return !n || n === 'cliente' || n === 'convidado';
-}
+import type {
+  ListaPedidoItem,
+  ListaPedidoState,
+  ItemUnicoQuantidadeState,
+  CategoriaPaginadaState,
+  Mensagem,
+} from "./types";
+import {
+  HUMAN_HANDOFF_CHIP,
+  CHECKOUT_SEQUENCE,
+  ESTADO_LABEL,
+  TOUR_KEY,
+  chatHistoryKey,
+  CHAT_HISTORY_MAX,
+  CHAT_HISTORY_MAX_AGE_MS,
+  TOUR_STEPS,
+} from "./constants";
+import { nomeEhPadraoDoSistema } from "./helpers";
 
 // ============================================================
 // COMPONENTE PRINCIPAL
@@ -261,7 +143,7 @@ const AgentePage: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   // --- Fluxo de autenticação por telefone (inline no chat) ---
-  const [authStep, setAuthStep]               = useState<'phone' | 'validating' | 'code_modal'>('phone');
+  const [authStep, setAuthStep]               = useState<'phone' | 'validating' | 'code_modal' | 'email'>('phone');
   const [authPhone, setAuthPhone]             = useState('');
   const [authCode, setAuthCode]               = useState('');
   const [authConfirmation, setAuthConfirmation] = useState<ConfirmationResult | null>(null);
@@ -269,6 +151,10 @@ const AgentePage: React.FC = () => {
   const [authAcceptTerms, setAuthAcceptTerms] = useState(false);
   const [authPhoneError, setAuthPhoneError]   = useState('');
   const [authCodeError, setAuthCodeError]     = useState('');
+  // --- Fallback: entrar com e-mail e senha (quando o SMS não chega) ---
+  const [authEmail, setAuthEmail]             = useState('');
+  const [authPassword, setAuthPassword]       = useState('');
+  const [authEmailError, setAuthEmailError]   = useState('');
   const [authSending, setAuthSending]         = useState(false);
   const [authSmsCooldownUntil, setAuthSmsCooldownUntil] = useState(0);
   const [authCooldownNow, setAuthCooldownNow] = useState(Date.now());
@@ -298,6 +184,7 @@ const AgentePage: React.FC = () => {
 
   // --- Conversa (sessão no Firestore)
   const [conversaId, setConversaId] = useState<string | null>(null);
+  const [escalandoAtendimento, setEscalandoAtendimento] = useState(false);
 
   // --- Estabelecimento (via hook)
   const {
@@ -393,12 +280,6 @@ const AgentePage: React.FC = () => {
   const [carregandoConversa, setCarregandoConversa] = useState(false);
   const [produtosCarregados, setProdutosCarregados] = useState(false);
 
-  // --- Botão flutuante arrastável (carrinho)
-  const [btnCartPos, setBtnCartPos]   = useState<{ x: number; y: number } | null>(null);
-  const isDraggingCartRef             = useRef(false);
-  const dragOffsetCartRef             = useRef({ x: 0, y: 0 });
-  const dragMovedCartRef              = useRef(false);
-
   // --- Recuperação de carrinho ao recarregar
   const [cartRecoveryPending, setCartRecoveryPending] = useState(false);
   const [headerOffset, setHeaderOffset] = useState(136);
@@ -407,13 +288,12 @@ const AgentePage: React.FC = () => {
   const [pedidosCached, setPedidosCached] = useState<Pedido[]>([]);
   const [pedidosPage, setPedidosPage] = useState(0);
 
-  // --- Tour onboarding
-  const [tourEtapa, setTourEtapa]     = useState<number | null>(null);
-  const [tourIniciado, setTourIniciado] = useState(false);
+  // --- Tour onboarding, voz, PIX e analytics (hooks isolados)
+  const { tourEtapa, proximaTour, fecharTour } = useTour(authLoading, carregandoConversa, mensagens.length);
+  const { gravando, transcrevendo, iniciarGravacao, pararGravacao } = useVoiceRecording(setInputText);
+  const { registrarCaptura, capturaSessionIdRef, capturaOrderCompletedRef } = useCaptureAnalytics(companyId, rawSlug, authLoading, user, userDocId);
+  usePixPaymentWatcher(pendingPixOrderId, setPendingPixOrderId, setMensagens);
 
-  // --- Voz
-  const [gravando, setGravando]           = useState(false);
-  const [transcrevendo, setTranscrevendo] = useState(false);
   const [carouselEnabled, setCarouselEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('testConfig_carouselEnabled');
@@ -426,144 +306,14 @@ const AgentePage: React.FC = () => {
   });
 
   const carouselDragRef   = useRef<{ el: HTMLDivElement; startX: number; scrollLeft: number; dragging: boolean } | null>(null);
-  const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
-  const audioChunksRef    = useRef<Blob[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
-  const pixPaidNotifiedRef = useRef<Set<string>>(new Set());
-  const capturaVisitorIdRef = useRef<string>('');
-  const capturaSessionIdRef = useRef<string>('');
-  const capturaUserDocIdRef = useRef<string | null>(null);
-  const capturaOrderCompletedRef = useRef(false);
-  const capturaEnteredWithoutLoginRef = useRef(false);
-  const isGuestMode = process.env.NEXT_PUBLIC_GUEST_MODE === 'true';
-
-  const registrarCaptura = React.useCallback((
-    eventType: AgenteCaptureEventType,
-    eventKey: string,
-    metadata?: Record<string, unknown>
-  ) => {
-    const visitorId = capturaVisitorIdRef.current;
-    const sessionId = capturaSessionIdRef.current;
-    if (!visitorId || !sessionId) return;
-
-    registrarCapturaDadosAgente({
-      eventId: `${companyId}:${eventKey}`,
-      eventType,
-      companyId,
-      visitorId,
-      sessionId,
-      userDocId: capturaUserDocIdRef.current,
-      metadata,
-    }).catch(console.error);
-  }, [companyId]);
-
-  // -------- Scroll automático --------
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const makeId = () =>
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    const visitorKey = 'agente_capturas_visitor_id';
-    let visitorId = localStorage.getItem(visitorKey);
-    if (!visitorId) {
-      visitorId = makeId();
-      localStorage.setItem(visitorKey, visitorId);
-    }
-
-    const sessionKey = `agente_capturas_session_id:${companyId}`;
-    let sessionId = sessionStorage.getItem(sessionKey);
-    const isNewSession = !sessionId;
-    if (!sessionId) {
-      sessionId = makeId();
-      sessionStorage.setItem(sessionKey, sessionId);
-    }
-
-    capturaVisitorIdRef.current = visitorId;
-    capturaSessionIdRef.current = sessionId;
-
-    if (!isNewSession) return;
-
-    const countKey = `agente_capturas_visit_count:${companyId}:${visitorId}`;
-    const visitCount = Number(localStorage.getItem(countKey) ?? '0') + 1;
-    localStorage.setItem(countKey, String(visitCount));
-
-    registrarCaptura('site_visit', `${sessionId}:site_visit`, {
-      rawSlug,
-      path: window.location.pathname,
-      visitCount,
-    });
-  }, [companyId, rawSlug, registrarCaptura]);
-
-  useEffect(() => {
-    capturaUserDocIdRef.current = userDocId;
-  }, [userDocId]);
-
-  useEffect(() => {
-    if (authLoading || isGuestMode || capturaEnteredWithoutLoginRef.current) return;
-    const needsLogin = !user || user.isAnonymous;
-    if (!needsLogin) return;
-    // So marca que a tela de login foi exibida; o evento so e registrado
-    // se a pessoa sair sem concluir (ver registrarSaida abaixo).
-    capturaEnteredWithoutLoginRef.current = true;
-  }, [authLoading, isGuestMode, user]);
-
-  useEffect(() => {
-    const registrarSaida = () => {
-      if (capturaEnteredWithoutLoginRef.current && !capturaUserDocIdRef.current) {
-        registrarCaptura('login_failed', `${capturaSessionIdRef.current}:login_failed:abandoned`, {
-          reason: 'abandoned_login_screen',
-        });
-      }
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') registrarSaida();
-    };
-
-    window.addEventListener('pagehide', registrarSaida);
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      window.removeEventListener('pagehide', registrarSaida);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [registrarCaptura]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens]);
-
-  useEffect(() => {
-    if (!pendingPixOrderId) return;
-
-    const unsub = onSnapshot(doc(db, "PurchaseRequests", pendingPixOrderId), (snap) => {
-      if (!snap.exists() || pixPaidNotifiedRef.current.has(pendingPixOrderId)) return;
-
-      const data = snap.data() as { paymentStatus?: string; orderNumber?: string; total?: number };
-      const paymentStatus = String(data.paymentStatus ?? "").toLowerCase();
-      if (paymentStatus !== "paid") return;
-
-      pixPaidNotifiedRef.current.add(pendingPixOrderId);
-      setPendingPixOrderId(null);
-      setMensagens((prev) => [
-        ...prev,
-        {
-          id: `pix-paid-${pendingPixOrderId}`,
-          role: "assistant" as const,
-          content: `✅ PIX do pedido #${data.orderNumber ?? ""} confirmado com sucesso!\n\nSeu pedido já foi recebido e seguirá para preparação.`,
-          timestamp: new Date(),
-          suggestions: ["Continuar comprando"],
-        },
-      ]);
-    });
-
-    return () => unsub();
-  }, [pendingPixOrderId]);
 
   // -------- Salva histórico de mensagens no localStorage --------
   useEffect(() => {
@@ -586,41 +336,14 @@ const AgentePage: React.FC = () => {
     } catch {}
   }, [mensagens, userDocId, rawSlug]);
 
-  // -------- Botão flutuante: posição inicial --------
-  useEffect(() => {
-    setBtnCartPos({ x: window.innerWidth - 80, y: window.innerHeight - 150 });
-  }, []);
-
-  // -------- Botão flutuante: drag (mouse + touch) --------
-  useEffect(() => {
-    const onMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDraggingCartRef.current) return;
-      dragMovedCartRef.current = true;
-      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-      const x = Math.max(0, Math.min(window.innerWidth  - 60, clientX - dragOffsetCartRef.current.x));
-      const y = Math.max(0, Math.min(window.innerHeight - 60, clientY - dragOffsetCartRef.current.y));
-      setBtnCartPos({ x, y });
-    };
-    const onEnd = () => { isDraggingCartRef.current = false; };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("touchmove", onMove, { passive: false });
-    window.addEventListener("mouseup", onEnd);
-    window.addEventListener("touchend", onEnd);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("mouseup", onEnd);
-      window.removeEventListener("touchend", onEnd);
-    };
-  }, []);
-
   // -------- Registrar Service Worker --------
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
+
+  const isGuestMode = process.env.NEXT_PUBLIC_GUEST_MODE === 'true';
 
   // -------- Autenticação --------
   useEffect(() => {
@@ -657,7 +380,7 @@ const AgentePage: React.FC = () => {
               }
             }
           } else {
-            const newDocId = await criarUsuarioNovo(currentUser.uid, currentUser.phoneNumber ?? undefined);
+            const newDocId = await criarUsuarioNovo(currentUser.uid, currentUser.phoneNumber ?? undefined, currentUser.email ?? undefined);
             setUserDocId(newDocId);
             if (!isGuestMode) {
               setFlowState(FLOW_STATES.COLLECTING_NAME);
@@ -716,16 +439,6 @@ const AgentePage: React.FC = () => {
       .then(setEnderecoSalvo)
       .catch(console.error);
   }, [user, userDocId]);
-
-  // -------- Tour: disparar após tudo carregado (1x por dispositivo) --------
-  useEffect(() => {
-    if (authLoading || carregandoConversa || mensagens.length === 0 || tourIniciado) return;
-    const visto = localStorage.getItem(TOUR_KEY);
-    if (!visto) {
-      setTourIniciado(true);
-      setTourEtapa(0);
-    }
-  }, [authLoading, carregandoConversa, mensagens.length, tourIniciado]);
 
   // -------- Iniciar conversa — restaura histórico do localStorage se existir --------
   useEffect(() => {
@@ -815,65 +528,6 @@ const AgentePage: React.FC = () => {
       setItemUnicoQtdState(null);
     }
   }, [flowState, listaPedidoState, itemUnicoQtdState]);
-
-  // -------- Avançar tour --------
-  const proximaTour = () => {
-    if (tourEtapa === null) return;
-    if (tourEtapa < TOUR_STEPS.length - 1) {
-      setTourEtapa(tourEtapa + 1);
-    } else {
-      localStorage.setItem(TOUR_KEY, "true");
-      setTourEtapa(null);
-    }
-  };
-
-  const fecharTour = () => {
-    localStorage.setItem(TOUR_KEY, "true");
-    setTourEtapa(null);
-  };
-
-  // -------- Voz --------
-  const transcreverAudio = async (blob: Blob) => {
-    setTranscrevendo(true);
-    try {
-      const file = new File([blob], 'audio.webm', { type: blob.type });
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-      const data = await res.json();
-      if (data.text?.trim()) setInputText(data.text.trim());
-    } catch (e) {
-      console.error('Erro ao transcrever áudio:', e);
-    } finally {
-      setTranscrevendo(false);
-    }
-  };
-
-  const iniciarGravacao = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-      const recorder = new MediaRecorder(stream, { mimeType });
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-      recorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        transcreverAudio(blob);
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setGravando(true);
-    } catch (e) {
-      console.error('Erro ao acessar microfone:', e);
-    }
-  };
-
-  const pararGravacao = () => {
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current = null;
-    setGravando(false);
-  };
 
   // -------- Auth por telefone (inline no chat) --------
   const formatPhoneAuth = (value: string) => {
@@ -985,6 +639,38 @@ const AgentePage: React.FC = () => {
     await signInWithCustomToken(auth, data.firebaseCustomToken);
   };
 
+  const sendSupabaseAuthCode = async (phone: string) => {
+    const response = await fetch('/api/auth/supabase/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error ?? 'supabase-send-code-failed') as Error & { code?: string };
+      error.code = data.error ?? 'supabase-send-code-failed';
+      throw error;
+    }
+  };
+
+  const verifySupabaseAuthCode = async () => {
+    const response = await fetch('/api/auth/supabase/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: authPhone, code: authCode }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.token) {
+      const error = new Error(data.error ?? 'supabase-verify-code-failed') as Error & { code?: string };
+      error.code = data.error ?? 'supabase-verify-code-failed';
+      throw error;
+    }
+
+    await signInWithCustomToken(auth, data.token);
+  };
+
   const handleAuthSendCode = async (options?: { resend?: boolean }) => {
     const formatted = validatePhone(authPhone);
     if (!formatted) {
@@ -1066,6 +752,30 @@ const AgentePage: React.FC = () => {
             id: `auth-code-sent-${ts}`,
             role: 'assistant',
             content: `Enviei um código de autenticação para o WhatsApp ${authPhone}. Digite os 6 dígitos abaixo:`,
+            timestamp: new Date(),
+          },
+          { id: 'auth-code-card', role: 'assistant', content: '', authCheckboxCard: true, timestamp: new Date() },
+        ]);
+        setAuthStep('code_modal');
+        return;
+      }
+
+      const supabaseStatus = await fetch('/api/auth/supabase/status', { cache: 'no-store' })
+        .then((res) => res.ok ? res.json() : { enabled: false })
+        .catch(() => ({ enabled: false }));
+
+      if (supabaseStatus.enabled) {
+        await sendSupabaseAuthCode(formatted);
+        startAuthSendCooldown(formatted);
+        setAuthConfirmation(null);
+        clearRecaptchaAuth();
+        setRecaptchaVisivel(false);
+        setMensagens(prev => [
+          ...prev.filter(m => !['auth-validating', 'auth-code-sent', 'auth-code-card', 'auth-recaptcha-visible'].includes(m.id)),
+          {
+            id: `auth-code-sent-${ts}`,
+            role: 'assistant',
+            content: `Código enviado para ${authPhone}. Digite os 6 dígitos abaixo:`,
             timestamp: new Date(),
           },
           { id: 'auth-code-card', role: 'assistant', content: '', authCheckboxCard: true, timestamp: new Date() },
@@ -1185,6 +895,8 @@ const AgentePage: React.FC = () => {
         'send-code-cooldown': 'Aguarde um instante antes de solicitar outro código.',
         'whatsapp-send-code-failed': 'Não foi possível enviar o código pelo WhatsApp. Tente novamente.',
         'whatsapp-auth-disabled': 'Autenticação por WhatsApp não está ativa neste ambiente.',
+        'supabase-send-code-failed': 'Não foi possível enviar o SMS pelo Supabase. Tente novamente.',
+        'supabase-auth-disabled': 'Autenticação via Supabase não está ativa neste ambiente.',
       };
       const msgErro = errMsgs[err.code ?? ''] ?? 'Não foi possível enviar o código. Tente novamente.';
       setMensagens(prev => [
@@ -1226,9 +938,17 @@ const AgentePage: React.FC = () => {
       } else if (authConfirmation) {
         await authConfirmation.confirm(authCode);
       } else {
-        const error = new Error('no-active-confirmation') as Error & { code?: string };
-        error.code = 'no-active-confirmation';
-        throw error;
+        const supabaseStatus = await fetch('/api/auth/supabase/status', { cache: 'no-store' })
+          .then((res) => res.ok ? res.json() : { enabled: false })
+          .catch(() => ({ enabled: false }));
+
+        if (supabaseStatus.enabled) {
+          await verifySupabaseAuthCode();
+        } else {
+          const error = new Error('no-active-confirmation') as Error & { code?: string };
+          error.code = 'no-active-confirmation';
+          throw error;
+        }
       }
       setAuthConfirmation(null);
       clearRecaptchaAuth();
@@ -1249,6 +969,11 @@ const AgentePage: React.FC = () => {
         'whatsapp-send-code-failed': 'Não foi possível enviar o código pelo WhatsApp. Tente novamente.',
         'whatsapp-verify-code-failed': 'Não foi possível validar o código do WhatsApp. Tente novamente.',
         'missing-firebase-custom-token': 'A API de WhatsApp validou o código, mas não retornou o token Firebase.',
+        'invalid-code': 'Código incorreto. Verifique o SMS.',
+        'supabase-verify-code-failed': 'Não foi possível validar o código pelo Supabase. Tente novamente.',
+        'supabase-auth-disabled': 'Autenticação via Supabase não está ativa neste ambiente.',
+        'firebase-admin-unavailable': 'Login indisponível neste servidor no momento.',
+        'token-error': 'Não foi possível concluir o login. Tente novamente.',
       };
       setMensagens(prev => [
         ...prev.filter(m => m.id !== 'auth-code-error'),
@@ -1267,6 +992,97 @@ const AgentePage: React.FC = () => {
       !m.id.startsWith('auth-code-sent')
     ));
     await handleAuthSendCode({ resend: true });
+  };
+
+  // -------- Fallback: entrar com e-mail e senha (SMS não chegou) --------
+  const handleShowEmailFallback = () => {
+    setAuthStep('email');
+    setAuthEmailError('');
+    setMensagens(prev => [
+      ...prev.filter(m => !['auth-code-card', 'auth-code-error'].includes(m.id) && !m.id.startsWith('auth-code-sent')),
+      { id: 'auth-email-card', role: 'assistant', content: '', emailPasswordCard: true, timestamp: new Date() },
+    ]);
+  };
+
+  const handleEmailPasswordBack = () => {
+    setAuthStep('phone');
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthEmailError('');
+    setMensagens(prev => prev.filter(m => m.id !== 'auth-email-card'));
+  };
+
+  const handleEmailPasswordSubmit = async () => {
+    const email = validateEmail(authEmail);
+    if (!email) {
+      setAuthEmailError('E-mail inválido. Verifique o endereço digitado.');
+      return;
+    }
+    if (authPassword.length < 6) {
+      setAuthEmailError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (!authAcceptTerms) {
+      setAuthEmailError('Para continuar, marque "Li e aceito os Termos de Uso e a Política de Privacidade".');
+      return;
+    }
+
+    setAuthSending(true);
+    setAuthEmailError('');
+    try {
+      try {
+        await setPersistence(auth, authKeepLogged ? browserLocalPersistence : browserSessionPersistence);
+      } catch (persistenceError) {
+        console.warn('[EmailAuth] Nao foi possivel ajustar persistencia; continuando com o padrao.', persistenceError);
+      }
+
+      try {
+        await signInWithEmailAndPassword(auth, email, authPassword);
+      } catch (signInError: unknown) {
+        const err = signInError as { code?: string };
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+          try {
+            await createUserWithEmailAndPassword(auth, email, authPassword);
+          } catch (createError: unknown) {
+            const createErr = createError as { code?: string };
+            if (createErr.code === 'auth/email-already-in-use') {
+              // Corrida entre abas: a conta passou a existir entre o signIn e o createUser. Tenta logar de novo.
+              await signInWithEmailAndPassword(auth, email, authPassword);
+            } else {
+              throw createError;
+            }
+          }
+        } else {
+          throw signInError;
+        }
+      }
+
+      setAuthEmail('');
+      setAuthPassword('');
+      setAuthStep('phone');
+      setMensagens(prev => prev.filter(m => m.id !== 'auth-email-card'));
+      setLoginCompleto(true); // Esconde auth imediatamente, antes do onAuthStateChanged disparar
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      registrarCaptura('login_failed', `${capturaSessionIdRef.current}:login_failed:email:${Date.now()}`, {
+        reason: 'email_signin_error',
+        errorCode: err.code ?? 'unknown',
+      });
+      console.error('[EmailAuth] Erro ao entrar com e-mail/senha:', err.code, err.message, e);
+      const msgs: Record<string, string> = {
+        'auth/wrong-password': 'Senha incorreta. Tente novamente.',
+        'auth/invalid-credential': 'E-mail ou senha incorretos. Verifique e tente novamente.',
+        'auth/invalid-email': 'E-mail inválido. Verifique o endereço digitado.',
+        'auth/weak-password': 'Senha muito fraca. Use pelo menos 6 caracteres.',
+        'auth/email-already-in-use': 'Este e-mail já está cadastrado. Verifique a senha e tente novamente.',
+        'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+        'auth/network-request-failed': 'Falha de conexão. Verifique a internet e tente novamente.',
+        'auth/user-disabled': 'Esta conta foi desativada. Entre em contato com o suporte.',
+      };
+      setAuthEmailError(msgs[err.code ?? ''] ?? 'Não foi possível entrar. Tente novamente.');
+    } finally {
+      setAuthSending(false);
+    }
   };
 
   // -------- Enviar mensagem --------
@@ -1517,47 +1333,6 @@ const AgentePage: React.FC = () => {
             customerDataColetado: wCustomerData,
           });
         }
-      };
-
-      const sincronizarDiffCarrinhoLocal = (cartAntes: CartItem[], cartDepois: CartItem[]) => {
-        if (!userDocId) return;
-        for (const novoItem of cartDepois) {
-          const itemAnterior = cartAntes.find(i => i.id === novoItem.id);
-          if (!itemAnterior || itemAnterior.quantity !== novoItem.quantity) {
-            sincronizarItemCarrinho(companyId, userDocId, novoItem).catch(console.error);
-          }
-        }
-        for (const itemAnterior of cartAntes) {
-          if (!cartDepois.find(i => i.id === itemAnterior.id)) {
-            removerItemCarrinhoFirestore(companyId, userDocId, itemAnterior.id).catch(console.error);
-          }
-        }
-      };
-
-      const adicionarItemAoCarrinhoLocal = (cartAtual: CartItem[], produto: Produto, quantidade: number): CartItem[] => {
-        const existente = cartAtual.find((i) => i.id === produto.id);
-        if (existente) {
-          return cartAtual.map((i) =>
-            i.id === produto.id ? { ...i, quantity: i.quantity + quantidade } : i
-          );
-        }
-        return [...cartAtual, { ...produto, quantity: quantidade }];
-      };
-
-      const proximoIndicePendente = (itens: ListaPedidoItem[], atual: number): number => {
-        for (let i = atual + 1; i < itens.length; i++) {
-          if (!itens[i].selecionadoId && !itens[i].cancelado) return i;
-        }
-        return -1;
-      };
-
-      const montarMensagemSelecaoItem = (_estado: ListaPedidoState, item: ListaPedidoItem, _index: number) => {
-        const opcoes = item.candidatos.slice(0, 5);
-        return {
-          texto: `Essas são as opções de ${item.termoOriginal ?? item.termoBusca} que temos hoje ⬇️`,
-          produtosCard: opcoes,
-          suggestions: ["Cancelar item"],
-        };
       };
 
       if (wFlowState === FLOW_STATES.BROWSING) {
@@ -1970,216 +1745,6 @@ const AgentePage: React.FC = () => {
             if (respostas.length === 0) {
               await salvarRespostaLocal("Não encontrei nenhum dos itens da lista no catálogo.", undefined, ["Continuar comprando"]);
             }
-            return;
-          }
-
-          if (estadoAtual.stage === "await_confirm") {
-            // Finalizar pedido → abre checkout (respeitando pedido mínimo)
-            if (ehIntencaoCheckout(texto)) {
-              const minimo = lojaConfig?.pedidoMinimo ?? 60;
-              const totalAtual = wCart.reduce((s, i) => s + i.price * i.quantity, 0);
-              if (minimo > 0 && totalAtual < minimo) {
-                setListaPedidoState(null);
-                const falta = (minimo - totalAtual).toFixed(2).replace('.', ',');
-                const minimoFmt = minimo.toFixed(2).replace('.', ',');
-                await salvarRespostaLocal(
-                  `Ops! 😊 O pedido mínimo aqui é de R$ ${minimoFmt}. Seu carrinho está em R$ ${totalAtual.toFixed(2).replace('.', ',')} — faltam apenas R$ ${falta} para finalizar. Adicione mais algum produto e é só chamar!`,
-                  undefined,
-                  ["Continuar comprando"]
-                );
-                return;
-              }
-              setListaPedidoState(null);
-              setShowCheckout(true);
-              return;
-            }
-            // Continuar comprando → limpa lista e volta ao chat
-            if (ehAcaoContinuarComprando(texto)) {
-              setListaPedidoState(null);
-              await salvarRespostaLocal("Tudo certo! O que mais posso separar para você? 😊");
-              return;
-            }
-            if (ehCancelamento(texto)) {
-              setListaPedidoState(null);
-              await salvarRespostaLocal("Lista cancelada. Se quiser, envie novamente.");
-              return;
-            }
-            // Se o cliente mandou um novo pedido, limpa o estado e processa normalmente
-            setListaPedidoState(null);
-          }
-
-          if (estadoAtual.stage === "await_mode") {
-            if (ehEscolhaAutomatica(texto)) {
-              const cartAntes = [...wCart];
-              const escolhidos: Produto[] = [];
-
-              for (const item of estadoAtual.itens) {
-                const escolhido = item.candidatos[0];
-                if (!escolhido) {
-                  item.cancelado = true;
-                  continue;
-                }
-                item.selecionadoId = escolhido.id;
-                escolhidos.push(escolhido);
-                wCart = adicionarItemAoCarrinhoLocal(wCart, escolhido, item.quantidade);
-              }
-
-              setCarrinho(wCart);
-              sincronizarDiffCarrinhoLocal(cartAntes, wCart);
-              setListaPedidoState(null);
-
-              const resumoAdd = estadoAtual.itens
-                .map((item) => {
-                  const p = item.candidatos.find((c) => c.id === item.selecionadoId);
-                  if (!p) return `- ${item.quantidade}x ${item.termoBusca} (sem produto correspondente)`;
-                  return `- ${item.quantidade}x ${p.name}`;
-                })
-                .join("\n");
-
-              await salvarRespostaLocal(
-                `Pronto! Preenchi automaticamente com as opcoes mais populares:\n${resumoAdd}\n\nDeseja finalizar a compra, alterar algum item ou continuar comprando?`,
-                escolhidos.slice(0, 6),
-                ["Finalizar pedido", "Continuar comprando"]
-              );
-              return;
-            }
-
-            if (ehEscolhaVariacao(texto)) {
-              estadoAtual.stage = "selecting_variant";
-              estadoAtual.currentIndex = 0;
-              setListaPedidoState(estadoAtual);
-
-              const itemAtual = estadoAtual.itens[0];
-              if (!itemAtual || itemAtual.candidatos.length === 0) {
-                estadoAtual.stage = "await_next_item";
-                setListaPedidoState(estadoAtual);
-                await salvarRespostaLocal(
-                  `Item 1/${estadoAtual.itens.length}: ${itemAtual?.quantidade ?? 0}x ${itemAtual?.termoBusca ?? "item"}\nNao encontrei variedades disponiveis para este item.\n\nDeseja ir para o proximo item da lista ou cancelar?`,
-                  undefined,
-                  ["Proximo item", "Cancelar lista"]
-                );
-                return;
-              }
-
-              const msg = montarMensagemSelecaoItem(estadoAtual, itemAtual, 0);
-              await salvarRespostaLocal(msg.texto, msg.produtosCard, msg.suggestions);
-              return;
-            }
-
-            await salvarRespostaLocal(
-              "Escolha uma opcao para continuar:",
-              undefined,
-              ["Preencher automaticamente (mais populares)", "Escolher variedade de cada item"]
-            );
-            return;
-          }
-
-          if (estadoAtual.stage === "selecting_variant") {
-            const idx = estadoAtual.currentIndex;
-            const itemAtual = estadoAtual.itens[idx];
-
-            if (!itemAtual) {
-              setListaPedidoState(null);
-              await salvarRespostaLocal(`Resumo final do carrinho:\n${formatarResumoCarrinho(wCart)}`);
-              return;
-            }
-
-            if (textoNormalizado.includes("cancelar item")) {
-              itemAtual.cancelado = true;
-              estadoAtual.stage = "await_next_item";
-              setListaPedidoState(estadoAtual);
-              await salvarRespostaLocal(
-                `Item "${itemAtual.termoBusca}" cancelado.\n\nDeseja ir para o proximo item da lista ou cancelar?`,
-                undefined,
-                ["Proximo item", "Cancelar lista"]
-              );
-              return;
-            }
-
-            const indiceEscolhido = encontrarIndiceEscolhido(texto, itemAtual.candidatos.length);
-            const escolhido = indiceEscolhido !== null
-              ? itemAtual.candidatos[indiceEscolhido as number]
-              : itemAtual.candidatos.find((c) => normalizar(c.name).includes(textoNormalizado) || textoNormalizado.includes(normalizar(c.name)));
-
-            if (!escolhido) {
-              const msg = montarMensagemSelecaoItem(estadoAtual, itemAtual, idx);
-              await salvarRespostaLocal(
-                `${msg.texto}\n\nSe preferir, toque em "Cancelar item".`,
-                msg.produtosCard,
-                msg.suggestions
-              );
-              return;
-            }
-
-            const cartAntes = [...wCart];
-            wCart = adicionarItemAoCarrinhoLocal(wCart, escolhido!, itemAtual.quantidade);
-            setCarrinho(wCart);
-            sincronizarDiffCarrinhoLocal(cartAntes, wCart);
-
-            itemAtual.selecionadoId = escolhido!.id;
-            estadoAtual.stage = "await_next_item";
-            setListaPedidoState(estadoAtual);
-            await salvarRespostaLocal(
-              `Adicionei ${itemAtual.quantidade}x ${escolhido!.name} ao carrinho.\n\nDeseja ir para o proximo item da lista ou cancelar?`,
-              [escolhido!],
-              ["Proximo item", "Cancelar lista"]
-            );
-            return;
-          }
-
-          if (estadoAtual.stage === "await_next_item") {
-            if (ehCancelamento(texto) || textoNormalizado.includes("cancelar lista")) {
-              setListaPedidoState(null);
-              await salvarRespostaLocal(
-                `Lista encerrada.\n\nResumo final do carrinho:\n${formatarResumoCarrinho(wCart)}`,
-                undefined,
-                ["Finalizar pedido", "Continuar comprando"]
-              );
-              return;
-            }
-
-            if (textoNormalizado.includes("proximo") || textoNormalizado.includes("próximo") || textoNormalizado === "1") {
-              const prox = proximoIndicePendente(estadoAtual.itens, estadoAtual.currentIndex);
-              if (prox === -1) {
-                const cardsFinal = estadoAtual.itens
-                  .map((it) => it.candidatos.find((c) => c.id === it.selecionadoId))
-                  .filter((p): p is Produto => Boolean(p))
-                  .slice(0, 6);
-                setListaPedidoState(null);
-                await salvarRespostaLocal(
-                  `Todos os itens da lista foram processados.\n\nResumo final do carrinho:\n${formatarResumoCarrinho(wCart)}`,
-                  cardsFinal,
-                  ["Finalizar pedido", "Continuar comprando"]
-                );
-                return;
-              }
-
-              estadoAtual.currentIndex = prox;
-              estadoAtual.stage = "selecting_variant";
-              setListaPedidoState(estadoAtual);
-              const itemProx = estadoAtual.itens[prox];
-
-              if (itemProx.candidatos.length === 0) {
-                estadoAtual.stage = "await_next_item";
-                setListaPedidoState(estadoAtual);
-                await salvarRespostaLocal(
-                  `Item ${prox + 1}/${estadoAtual.itens.length}: ${itemProx.quantidade}x ${itemProx.termoBusca}\nNao encontrei variedades disponiveis para este item.\n\nDeseja ir para o proximo item da lista ou cancelar?`,
-                  undefined,
-                  ["Proximo item", "Cancelar lista"]
-                );
-                return;
-              }
-
-              const msg = montarMensagemSelecaoItem(estadoAtual, itemProx, prox);
-              await salvarRespostaLocal(msg.texto, msg.produtosCard, msg.suggestions);
-              return;
-            }
-
-            await salvarRespostaLocal(
-              "Escolha uma opcao para continuar a lista:",
-              undefined,
-              ["Proximo item", "Cancelar lista"]
-            );
             return;
           }
         }
@@ -2833,7 +2398,7 @@ const AgentePage: React.FC = () => {
         try {
           wCustomerData = { ...wCustomerData, name: nomeCliente };
           setCustomerData(wCustomerData);
-          const orderResult = await createOrder(companyId, wCustomerData, wCart, userDocId, nomeCliente);
+          const orderResult = await createOrder(companyId, wCustomerData, wCart, userDocId, nomeCliente, undefined, cid);
           capturaOrderCompletedRef.current = true;
           registrarCaptura('order_completed', `${orderResult.id}:order_completed`, {
             orderNumber: orderResult.orderNumber,
@@ -3015,10 +2580,48 @@ const AgentePage: React.FC = () => {
     ) {
       chips.unshift("Finalizar pedido");
     }
+    if (
+      msg.role === "assistant" &&
+      msg.id === ultimaMsgAssistenteId &&
+      conversaId &&
+      userDocId &&
+      !chips.includes(HUMAN_HANDOFF_CHIP)
+    ) {
+      chips.push(HUMAN_HANDOFF_CHIP);
+    }
     return chips;
   };
   // Chat tem conteúdo se há mensagem de welcome OU mensagens de auth (não mostra tela de loading)
   const saudacaoInicialCarregada = mensagens.length > 0;
+
+  const handleEscalateToHuman = async () => {
+    if (!userDocId || !conversaId || escalandoAtendimento) return;
+    setEscalandoAtendimento(true);
+    const contexto = mensagens
+      .slice(-4)
+      .map((m) => `${m.role === "user" ? "Cliente" : "Agente"}: ${m.content}`)
+      .join(" | ") || "Sem mensagens anteriores.";
+
+    try {
+      await escalarParaAtendimentoHumano(companyId, userDocId, conversaId, nomeCliente, contexto);
+      setMensagens(prev => [...prev, {
+        id: `escalate-${Date.now()}`,
+        role: "assistant" as const,
+        content: "Ok! Encaminhei sua conversa para um atendente humano. Em breve alguém vai continuar o atendimento por aqui. 🙋",
+        timestamp: new Date(),
+      }]);
+    } catch (e) {
+      console.error("Erro ao encaminhar para atendimento humano:", e);
+      setMensagens(prev => [...prev, {
+        id: `escalate-err-${Date.now()}`,
+        role: "assistant" as const,
+        content: "❌ Não consegui encaminhar para um atendente agora. Tente novamente em instantes.",
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setEscalandoAtendimento(false);
+    }
+  };
 
   const handleAdicionarQtdCarrinho = (item: CartItem) => {
     const novaQtd = item.quantity + 1;
@@ -3253,6 +2856,9 @@ const AgentePage: React.FC = () => {
           setAuthStep('phone');
           setAuthPhone('');
           setAuthCode('');
+          setAuthEmail('');
+          setAuthPassword('');
+          setAuthEmailError('');
           setAuthConfirmation(null);
           clearRecaptchaAuth();
           setRecaptchaVisivel(false);
@@ -3451,6 +3057,23 @@ const AgentePage: React.FC = () => {
                   resendDisabled={authSmsCooldownMs > 0}
                   resendLabel={authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "Reenviar código"}
                   onResend={handleAuthResend}
+                  showEmailFallback={authStep === 'code_modal' && authSmsCooldownMs === 0}
+                  onEmailFallbackClick={handleShowEmailFallback}
+                />
+              ) : msg.emailPasswordCard ? (
+                <EmailPasswordCard
+                  email={authEmail}
+                  onChangeEmail={(v) => { setAuthEmail(v); setAuthEmailError(''); }}
+                  password={authPassword}
+                  onChangePassword={(v) => { setAuthPassword(v); setAuthEmailError(''); }}
+                  authKeepLogged={authKeepLogged}
+                  onChangeKeepLogged={setAuthKeepLogged}
+                  authAcceptTerms={authAcceptTerms}
+                  onChangeAcceptTerms={setAuthAcceptTerms}
+                  errorMessage={authEmailError}
+                  sending={authSending}
+                  onSubmit={handleEmailPasswordSubmit}
+                  onBack={handleEmailPasswordBack}
                 />
               ) : msg.content.trim() ? (
               <div
@@ -3582,7 +3205,8 @@ const AgentePage: React.FC = () => {
                     <button
                       key={s}
                       className={styles.selectionChip}
-                      onClick={() => enviarMensagem(s)}
+                      disabled={s === HUMAN_HANDOFF_CHIP && escalandoAtendimento}
+                      onClick={() => (s === HUMAN_HANDOFF_CHIP ? handleEscalateToHuman() : enviarMensagem(s))}
                     >
                       {s}
                     </button>
@@ -3733,6 +3357,7 @@ const AgentePage: React.FC = () => {
       <div className={styles.bottomBar}>
       <div className={styles.inputContainer}>
         {precisaLogin ? (
+          authStep === 'email' ? null : (
           <input
             ref={inputRef}
             type={authStep !== 'code_modal' ? "tel" : "text"}
@@ -3755,6 +3380,7 @@ const AgentePage: React.FC = () => {
             }}
             disabled={authSending || authStep === 'validating' || (authStep !== 'code_modal' && authSmsCooldownMs > 0)}
           />
+          )
         ) : (
           <textarea
             ref={textareaRef}
@@ -3788,6 +3414,7 @@ const AgentePage: React.FC = () => {
             )}
           </button>
         )}
+        {!(precisaLogin && authStep === 'email') && (
         <button
           className={styles.sendButton}
           onClick={() => {
@@ -3808,6 +3435,7 @@ const AgentePage: React.FC = () => {
             <Send size={20} />
           )}
         </button>
+        )}
       </div>{/* /inputContainer */}
 
       {/* Info strip — dentro da barra inferior, só quando logado */}

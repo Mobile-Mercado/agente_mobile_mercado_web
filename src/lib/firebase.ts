@@ -3,6 +3,7 @@ import { initializeApp, FirebaseApp } from "firebase/app";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getAuth, Auth, GoogleAuthProvider, OAuthProvider } from "firebase/auth";
 import { getStorage, FirebaseStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,6 +17,28 @@ const firebaseConfig = {
 };
 
 const app: FirebaseApp = initializeApp(firebaseConfig);
+
+// App Check: da ao Firebase um sinal de confiança de que o pedido vem do site de verdade
+// (nao de automacao), do mesmo jeito que os apps mobile fazem com Play Integrity/App Attest.
+// So ativa se a site key estiver configurada (ver .env.example) - sem ela, nao muda nada.
+if (typeof window !== "undefined") {
+  const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
+  if (appCheckSiteKey) {
+    if (process.env.NODE_ENV !== "production") {
+      // Necessario em localhost/dev: gera um token de depuracao no console do navegador
+      // que precisa ser cadastrado em Firebase Console > App Check > Gerenciar tokens de depuracao.
+      (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+    try {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (err) {
+      console.error("[AppCheck] Falha ao inicializar:", err);
+    }
+  }
+}
 
 export const db: Firestore = getFirestore(app);
 export const auth: Auth = getAuth(app);
