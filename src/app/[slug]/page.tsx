@@ -3057,7 +3057,7 @@ const AgentePage: React.FC = () => {
                   resendDisabled={authSmsCooldownMs > 0}
                   resendLabel={authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "Reenviar código"}
                   onResend={handleAuthResend}
-                  showEmailFallback={authStep === 'code_modal' && authSmsCooldownMs === 0}
+                  showEmailFallback={authStep === 'code_modal'}
                   onEmailFallbackClick={handleShowEmailFallback}
                 />
               ) : msg.emailPasswordCard ? (
