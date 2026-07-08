@@ -6,10 +6,12 @@ import styles from "./Login.module.css";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-import { validatePhone } from '@/lib/validation';
+import { validatePhone, validateEmail } from '@/lib/validation';
 import {
   signInWithPopup,
   signInWithPhoneNumber,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   RecaptchaVerifier,
   ConfirmationResult,
   onAuthStateChanged
@@ -38,6 +40,10 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
   const router = useRouter();
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const sendInFlightRef = useRef(false);
@@ -246,6 +252,68 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
     }
   };
 
+  const emailErrorMessage = (code?: string): string => {
+    switch (code) {
+      case "auth/wrong-password":          return "Senha incorreta. Tente novamente.";
+      case "auth/invalid-credential":      return "E-mail ou senha incorretos. Verifique e tente novamente.";
+      case "auth/invalid-email":           return "E-mail inválido. Verifique o endereço digitado.";
+      case "auth/weak-password":           return "Senha muito fraca. Use pelo menos 6 caracteres.";
+      case "auth/email-already-in-use":    return "Este e-mail já está cadastrado. Verifique a senha e tente novamente.";
+      case "auth/too-many-requests":       return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+      case "auth/network-request-failed":  return "Falha de conexão. Verifique a internet e tente novamente.";
+      case "auth/user-disabled":           return "Esta conta foi desativada. Entre em contato com o suporte.";
+      default:                             return "Não foi possível entrar. Tente novamente.";
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    const normalizedEmail = validateEmail(email);
+    if (!normalizedEmail) {
+      setEmailError("E-mail inválido. Verifique o endereço digitado.");
+      return;
+    }
+    if (password.length < 6) {
+      setEmailError("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    setIsEmailLoading(true);
+    setEmailError("");
+
+    try {
+      try {
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      } catch (signInError: unknown) {
+        const err = signInError as { code?: string };
+        if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+          try {
+            await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+          } catch (createError: unknown) {
+            const createErr = createError as { code?: string };
+            if (createErr.code === "auth/email-already-in-use") {
+              // Corrida entre abas: a conta passou a existir entre o signIn e o createUser. Tenta logar de novo.
+              await signInWithEmailAndPassword(auth, normalizedEmail, password);
+            } else {
+              throw createError;
+            }
+          }
+        } else {
+          throw signInError;
+        }
+      }
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      console.error("[Login] Erro ao entrar com e-mail/senha:", err.code, err.message, error);
+      setEmailError(emailErrorMessage(err.code));
+    } finally {
+      setIsEmailLoading(false);
+    }
+  };
+
+  const handleEmailKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !isEmailLoading) handleEmailLogin();
+  };
+
   const resetPhoneLogin = () => {
     setIsCodeSent(false);
     setConfirmationResult(null);
@@ -354,6 +422,50 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
                   disabled={!phoneNumber.trim() || isLoading}
                 >
                   {isLoading ? "Enviando..." : "Continuar"}
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.divider}>
+              <span className={styles.dividerText}>ou</span>
+            </div>
+
+            <div className={styles.phoneSection}>
+              <label htmlFor="email" className={styles.label}>
+                E-mail
+              </label>
+              <div className={styles.phoneInputContainer}>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
+                  onKeyDown={handleEmailKeyDown}
+                  className={styles.phoneInput}
+                  disabled={isEmailLoading}
+                />
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Senha (mínimo 6 caracteres)"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setEmailError(""); }}
+                  onKeyDown={handleEmailKeyDown}
+                  className={styles.phoneInput}
+                  disabled={isEmailLoading}
+                />
+                {emailError && (
+                  <div className={styles.errorMessage} style={{ marginBottom: 0 }}>
+                    {emailError}
+                  </div>
+                )}
+                <button
+                  onClick={handleEmailLogin}
+                  className={styles.phoneButton}
+                  disabled={!email.trim() || !password.trim() || isEmailLoading}
+                >
+                  {isEmailLoading ? "Entrando..." : "Continuar"}
                 </button>
               </div>
             </div>
