@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { auth } from "@/lib/firebase";
 
 interface UseVoiceRecordingResult {
   gravando: boolean;
@@ -19,7 +20,13 @@ export function useVoiceRecording(setInputText: (text: string) => void): UseVoic
       const file = new File([blob], 'audio.webm', { type: blob.type });
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Login necessario para transcrever audio.");
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
       const data = await res.json();
       if (data.text?.trim()) setInputText(data.text.trim());
     } catch (e) {

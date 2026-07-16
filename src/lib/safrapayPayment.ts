@@ -3,6 +3,7 @@
  */
 
 import type { CardData } from "@/components/CheckoutModal/CardPaymentForm";
+import { auth } from "@/lib/firebase";
 
 export interface SafrapayPaymentRequest {
   type: "pix" | "card";
@@ -10,6 +11,7 @@ export interface SafrapayPaymentRequest {
   orderId: string;
   description: string;
   customerName: string;
+  userDocId: string;
   cardData?: CardData;
 }
 
@@ -55,12 +57,16 @@ export async function processSafrapayPayment(
           installments: request.cardData?.installments,
         };
 
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Login necessario para processar pagamento");
+
   const response = await fetch("/api/payment/safrapay", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, userDocId: request.userDocId }),
   });
 
   if (!response.ok) {

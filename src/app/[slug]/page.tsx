@@ -44,6 +44,7 @@ import {
   buscarProdutosPorCategoria,
   embaralharArray,
   calcularScorePorTags,
+  temMedidaExplicitaBusca,
 } from "@/lib/productSearch";
 import {
   limparMarkdownBasico,
@@ -86,7 +87,6 @@ import {
   criarConversa,
   salvarMensagem,
   atualizarConversa,
-  escalarParaAtendimentoHumano,
   buscarConversaAtiva,
   carregarExemplosAtivos,
   buscarEnderecoDefault,
@@ -113,7 +113,6 @@ import type {
   Mensagem,
 } from "./types";
 import {
-  HUMAN_HANDOFF_CHIP,
   CHECKOUT_SEQUENCE,
   ESTADO_LABEL,
   TOUR_KEY,
@@ -184,7 +183,6 @@ const AgentePage: React.FC = () => {
 
   // --- Conversa (sessão no Firestore)
   const [conversaId, setConversaId] = useState<string | null>(null);
-  const [escalandoAtendimento, setEscalandoAtendimento] = useState(false);
 
   // --- Estabelecimento (via hook)
   const {
@@ -1121,7 +1119,7 @@ const AgentePage: React.FC = () => {
         {
           id: `ask-name-${Date.now()}`,
           role: "assistant",
-          content: "Antes de continuar, como vocÃª gostaria de ser chamado?",
+          content: "Antes de continuar, como você gostaria de ser chamado?",
           timestamp: new Date(),
         },
       ]);
@@ -1657,10 +1655,11 @@ const AgentePage: React.FC = () => {
             stage: "await_confirm",
             currentIndex: 0,
             itens: itensExtraidos.map((it) => {
+              const temMedidaExplicita = temMedidaExplicitaBusca(it.termoBusca);
               // ✨ Detecção autônoma: busca por marca pura (com mais inteligência)
               const ehBuscaMarcaPura = ehBuscaPuraporMarca(it.termoBusca, produtos);
               
-              if (ehBuscaMarcaPura) {
+              if (ehBuscaMarcaPura && !temMedidaExplicita) {
                 const marcaExtraida = detectarBuscaPorMarca(it.termoBusca);
                 if (marcaExtraida) {
                   const candidatos = buscarProdutosPorMarca(marcaExtraida, produtos).slice(0, 6);
@@ -1672,7 +1671,7 @@ const AgentePage: React.FC = () => {
               let candidatos = (wordKeysEnabled ? filtrarProdutosWordKeys(it.termoBusca, produtos) : filtrarProdutos(it.termoBusca, produtos)).slice(0, 6);
               
               // Se não encontrou e detectou marca, tenta buscar por marca
-              if (candidatos.length === 0) {
+              if (candidatos.length === 0 && !temMedidaExplicita) {
                 const marcaDetectada = detectarBuscaPorMarca(it.termoBusca);
                 if (marcaDetectada) {
                   candidatos = buscarProdutosPorMarca(marcaDetectada, produtos).slice(0, 6);
@@ -1694,6 +1693,7 @@ const AgentePage: React.FC = () => {
 
             for (const it of estadoAtual.itens) {
               const palavrasIt = extrairPalavrasBaseBusca(it.termoBusca);
+              const temMedidaExplicita = temMedidaExplicitaBusca(it.termoBusca);
 
               // ✨ Verifica com autonomia se é uma busca por marca pura
               const ehBuscaMarcaPura = ehBuscaPuraporMarca(it.termoBusca, produtos);
@@ -1703,13 +1703,20 @@ const AgentePage: React.FC = () => {
                 (ehBuscaMarcaPura || marcaExtraidaDoTermo || palavrasIt.length < 2 || it.candidatos.some((p) => produtoCobreTermos(p, palavrasIt)));
 
               if (temCobertura) {
+                const houveIndisponivelAntes = respostas.some((resposta) =>
+                  resposta.tipo === 'fallback' && resposta.texto.startsWith('Não temos opção de ')
+                );
                 const titulo = ehBuscaMarcaPura && marcaExtraidaDoTermo
                   ? `Produtos ${marcaExtraidaDoTermo.charAt(0).toUpperCase() + marcaExtraidaDoTermo.slice(1)} ⬇️`
-                  : `Opções de ${(it.termoOriginal ?? it.termoBusca).charAt(0).toUpperCase() + (it.termoOriginal ?? it.termoBusca).slice(1)} ⬇️`;
+                  : `${houveIndisponivelAntes ? 'Mas aqui estão as opções' : 'Opções'} de ${(it.termoOriginal ?? it.termoBusca).charAt(0).toUpperCase() + (it.termoOriginal ?? it.termoBusca).slice(1)} disponíveis ⬇️`;
                 respostas.push({ tipo: 'section', titulo, produtos: it.candidatos, termoBusca: it.termoBusca });
               } else if (ehBuscaMarcaPura && marcaExtraidaDoTermo && it.candidatos.length === 0) {
                 const marcaCapitalizada = marcaExtraidaDoTermo.charAt(0).toUpperCase() + marcaExtraidaDoTermo.slice(1);
                 respostas.push({ tipo: 'fallback', texto: `Desculpa! Não temos produtos da marca **${marcaCapitalizada}** no momento. 😔` });
+              } else if (temMedidaExplicita) {
+                const nomeItem = (it.termoOriginal ?? it.termoBusca).trim();
+                const nomeFormatado = nomeItem.charAt(0).toUpperCase() + nomeItem.slice(1);
+                respostas.push({ tipo: 'fallback', texto: `Não temos opção de ${nomeFormatado} no estoque.` });
               } else if (palavrasIt.length >= 2 && !ehBuscaMarcaPura) {
                 // Fallback progressivo (APENAS para buscas que NÃO são por marca pura)
                 let achou = false;
@@ -1729,7 +1736,7 @@ const AgentePage: React.FC = () => {
               }
             }
 
-            setListaPedidoState(estadoAtual);
+            setListaPedidoState(null);
 
             for (let i = 0; i < respostas.length; i++) {
               const entrada = respostas[i];
@@ -2220,9 +2227,15 @@ const AgentePage: React.FC = () => {
       let rawText = "";
       let streamStarted = false;
 
+      const chatToken = await auth.currentUser?.getIdToken();
+      if (!chatToken) throw new Error("Login necessario para usar o chat.");
+
       const chatRes = await fetch('/api/chat', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${chatToken}`,
+        },
         body:    JSON.stringify({ messages: historico, systemPrompt }),
       });
 
@@ -2417,9 +2430,14 @@ const AgentePage: React.FC = () => {
                   userVisibleOnly: true,
                   applicationServerKey: vapidKey,
                 });
+                const pushToken = await auth.currentUser?.getIdToken();
+                if (!pushToken) return;
                 await fetch("/api/push/inscrever", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${pushToken}`,
+                  },
                   body: JSON.stringify({ userId: userDocId, subscription: sub }),
                 });
               }
@@ -2580,48 +2598,10 @@ const AgentePage: React.FC = () => {
     ) {
       chips.unshift("Finalizar pedido");
     }
-    if (
-      msg.role === "assistant" &&
-      msg.id === ultimaMsgAssistenteId &&
-      conversaId &&
-      userDocId &&
-      !chips.includes(HUMAN_HANDOFF_CHIP)
-    ) {
-      chips.push(HUMAN_HANDOFF_CHIP);
-    }
     return chips;
   };
   // Chat tem conteúdo se há mensagem de welcome OU mensagens de auth (não mostra tela de loading)
   const saudacaoInicialCarregada = mensagens.length > 0;
-
-  const handleEscalateToHuman = async () => {
-    if (!userDocId || !conversaId || escalandoAtendimento) return;
-    setEscalandoAtendimento(true);
-    const contexto = mensagens
-      .slice(-4)
-      .map((m) => `${m.role === "user" ? "Cliente" : "Agente"}: ${m.content}`)
-      .join(" | ") || "Sem mensagens anteriores.";
-
-    try {
-      await escalarParaAtendimentoHumano(companyId, userDocId, conversaId, nomeCliente, contexto);
-      setMensagens(prev => [...prev, {
-        id: `escalate-${Date.now()}`,
-        role: "assistant" as const,
-        content: "Ok! Encaminhei sua conversa para um atendente humano. Em breve alguém vai continuar o atendimento por aqui. 🙋",
-        timestamp: new Date(),
-      }]);
-    } catch (e) {
-      console.error("Erro ao encaminhar para atendimento humano:", e);
-      setMensagens(prev => [...prev, {
-        id: `escalate-err-${Date.now()}`,
-        role: "assistant" as const,
-        content: "❌ Não consegui encaminhar para um atendente agora. Tente novamente em instantes.",
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setEscalandoAtendimento(false);
-    }
-  };
 
   const handleAdicionarQtdCarrinho = (item: CartItem) => {
     const novaQtd = item.quantity + 1;
@@ -3205,8 +3185,7 @@ const AgentePage: React.FC = () => {
                     <button
                       key={s}
                       className={styles.selectionChip}
-                      disabled={s === HUMAN_HANDOFF_CHIP && escalandoAtendimento}
-                      onClick={() => (s === HUMAN_HANDOFF_CHIP ? handleEscalateToHuman() : enviarMensagem(s))}
+                      onClick={() => enviarMensagem(s)}
                     >
                       {s}
                     </button>

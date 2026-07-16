@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 /**
  * DEBUG: Verificar configuração Safrapay de um estabelecimento
@@ -10,9 +9,10 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const establishmentId = searchParams.get("establishmentId");
-    const adminSecret = searchParams.get("adminSecret");
+    const adminSecret = request.headers.get("x-admin-secret") || "";
+    const correctSecret = process.env.ADMIN_SECRET?.trim() || "";
 
-    if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    if (!correctSecret || !adminSecret || adminSecret !== correctSecret) {
       return NextResponse.json(
         { error: "Acesso negado" },
         { status: 401 }
@@ -26,17 +26,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const docRef = doc(db, "estabelecimentos", establishmentId);
-    const docSnap = await getDoc(docRef);
+    const db = getAdminDb();
+    if (!db) {
+      return NextResponse.json(
+        { error: "Firebase Admin nao configurado no servidor" },
+        { status: 503 }
+      );
+    }
 
-    if (!docSnap.exists()) {
+    const docSnap = await db.collection("estabelecimentos").doc(establishmentId).get();
+
+    if (!docSnap.exists) {
       return NextResponse.json(
         { error: "Estabelecimento não encontrado" },
         { status: 404 }
       );
     }
 
-    const data = docSnap.data();
+    const data = docSnap.data() || {};
     const safrapayConfig = data.safrapay;
     const safeSafrapayConfig = safrapayConfig
       ? {

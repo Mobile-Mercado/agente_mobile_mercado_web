@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAdminSessionCookie } from "@/lib/apiAuth";
 
 export async function POST(req: NextRequest) {
   const { senha } = await req.json();
@@ -8,5 +9,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true });
+  return createAdminSessionCookie(NextResponse.json({ ok: true }));
 }

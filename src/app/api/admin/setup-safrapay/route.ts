@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const { adminSecret, establishmentId, safrapayConfig } = body;
 
     // Validar admin secret
-    const correctSecret = process.env.ADMIN_SECRET;
+    const correctSecret = process.env.ADMIN_SECRET?.trim();
     if (!adminSecret || adminSecret !== correctSecret) {
       return NextResponse.json(
         { error: "Acesso negado" },
@@ -55,7 +55,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Safrapay configurado para ${establishmentId}`,
-      config: safrapayConfig,
+      config: {
+        enabled: Boolean(safrapayConfig.enabled),
+        environment: safrapayConfig.environment,
+        merchantId: safrapayConfig.merchantId ? "***" : undefined,
+        accessToken: safrapayConfig.accessToken ? "***" : undefined,
+        webhookSecret: safrapayConfig.webhookSecret ? "***" : undefined,
+      },
     });
   } catch (error) {
     console.error("Erro ao configurar Safrapay:", error);

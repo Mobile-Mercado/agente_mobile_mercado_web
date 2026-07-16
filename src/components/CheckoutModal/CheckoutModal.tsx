@@ -496,11 +496,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
 
         // Chamar API de Safrapay
+        const paymentToken = await auth.currentUser?.getIdToken();
+        if (!paymentToken) throw new Error("Login necessario para processar pagamento.");
+
         const paymentResponse = await fetch("/api/payment/safrapay", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${paymentToken}`,
+          },
           body: JSON.stringify({
             type: "card",
+            userDocId,
             companyId,
             amount: Math.round(total * 100), // Em centavos
             orderId: paymentOrderId,
@@ -582,11 +589,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const result = await createOrder(companyId, customerData, carrinho, userDocId, nomeCliente, paymentProviderData);
 
       if (payId === "pix" && safrapayConfig?.enabled) {
+        const paymentToken = await auth.currentUser?.getIdToken();
+        if (!paymentToken) throw new Error("Login necessario para gerar PIX.");
+
         const paymentResponse = await fetch("/api/payment/safrapay", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${paymentToken}`,
+          },
           body: JSON.stringify({
             type: "pix",
+            userDocId,
             companyId,
             amount: Math.round(total * 100),
             orderId: result.id,

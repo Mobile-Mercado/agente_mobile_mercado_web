@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit, getClientIp, requireUserDocOwner } from "@/lib/apiAuth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,6 +21,7 @@ interface IncomingSafrapayBody {
   customerDocument?: unknown;
   customerPhone?: unknown;
   customerEmail?: unknown;
+  userDocId?: unknown;
   paymentMethod?: unknown;
   cardNumber?: unknown;
   cardholderName?: unknown;
@@ -154,6 +156,17 @@ function normalizeSuccessResponse(type: SafrapayPaymentType, data: Record<string
 
 export async function POST(request: NextRequest) {
   try {
+    const rawBody = (await request.json()) as IncomingSafrapayBody;
+    const userDocId = getString(rawBody.userDocId);
+    const authResult = await requireUserDocOwner(request, userDocId);
+    if (!authResult.ok) return authResult.response;
+
+    const rateLimited = enforceRateLimit(`safrapay:${authResult.user.uid}:${getClientIp(request)}`, {
+      limit: 12,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimited) return rateLimited;
+
     const apiBaseUrl = getSafrapayApiBaseUrl();
     if (!apiBaseUrl) {
       return NextResponse.json(
@@ -162,8 +175,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as IncomingSafrapayBody;
-    const { error, payload, type } = buildExternalPayload(body);
+    const { error, payload, type } = buildExternalPayload(rawBody);
 
     if (error || !payload || !type) {
       return NextResponse.json({ error: error || "Tipo de pagamento invalido" }, { status: 400 });

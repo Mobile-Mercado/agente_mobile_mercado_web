@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { QrCode, Copy, Check } from "lucide-react";
 import styles from "./PIXPaymentForm.module.css";
+import { auth } from "@/lib/firebase";
 
 function isQrImage(value: string) {
   return value.startsWith("data:image/") || value.startsWith("http://") || value.startsWith("https://");
@@ -19,6 +20,7 @@ interface PIXPaymentFormProps {
   total: number;
   nomeCliente: string;
   customerDocument: string;
+  userDocId?: string;
   orderId: string;
   description: string;
   safrapayConfig?: { enabled: boolean; environment?: "hml" | "prod" };
@@ -31,6 +33,7 @@ export const PIXPaymentForm: React.FC<PIXPaymentFormProps> = ({
   total,
   nomeCliente,
   customerDocument,
+  userDocId,
   orderId,
   description,
   safrapayConfig,
@@ -58,11 +61,20 @@ export const PIXPaymentForm: React.FC<PIXPaymentFormProps> = ({
       setInitialized(true);
 
       try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token || !userDocId) {
+          throw new Error("Login necessario para gerar PIX");
+        }
+
         const response = await fetch("/api/payment/safrapay", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             type: "pix",
+            userDocId,
             amount: Math.round(total * 100),
             orderId,
             description,
@@ -104,7 +116,7 @@ export const PIXPaymentForm: React.FC<PIXPaymentFormProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [customerDocument, description, initialized, nomeCliente, onQRCodeGenerated, orderId, safrapayConfig, total]);
+  }, [customerDocument, description, initialized, nomeCliente, onQRCodeGenerated, orderId, safrapayConfig, total, userDocId]);
 
   const handleCopyToClipboard = async () => {
     try {

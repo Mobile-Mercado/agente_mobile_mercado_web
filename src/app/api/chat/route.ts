@@ -1,9 +1,19 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
+import { enforceRateLimit, getClientIp, requireFirebaseAuth } from "@/lib/apiAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const authResult = await requireFirebaseAuth(req);
+  if (!authResult.ok) return authResult.response;
+
+  const rateLimited = enforceRateLimit(`chat:${authResult.user.uid}:${getClientIp(req)}`, {
+    limit: 40,
+    windowMs: 60 * 1000,
+  });
+  if (rateLimited) return rateLimited;
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const { messages, systemPrompt } = await req.json();
 

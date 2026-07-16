@@ -44,6 +44,14 @@ function extrairPreferenciaMedidaBusca(texto: string): MedidaNormalizada | null 
   return medidas.length > 0 ? medidas[0] : null;
 }
 
+export function temMedidaExplicitaBusca(texto: string): boolean {
+  return Boolean(extrairPreferenciaMedidaBusca(texto));
+}
+
+function medidasIguais(a: MedidaNormalizada, b: MedidaNormalizada): boolean {
+  return a.base === b.base && Math.abs(a.valor - b.valor) < 0.001;
+}
+
 function ehTokenDeMedida(token: string): boolean {
   const t = normalizar(token.trim());
   if (!t) return false;
@@ -594,6 +602,7 @@ export function filtrarProdutos(texto: string, produtos: Produto[]): Produto[] {
         ...(p.wordKeys ?? []),
         ...(p.searchIndex ?? []),
       ].flatMap(extrairMedidasDeTexto);
+      const temMedidaExata = medidasProduto.some((medida) => medidasIguais(medida, medidaPreferida));
 
       for (const medida of medidasProduto) {
         if (medida.base !== medidaPreferida.base) continue;
@@ -602,6 +611,10 @@ export function filtrarProdutos(texto: string, produtos: Produto[]): Produto[] {
       }
 
       // Busca só de medida ("1 litro", "250 gramas"): exige medida compatível.
+      if (!temMedidaExata) {
+        return { produto: p, score: 0, deltaMedida: Number.POSITIVE_INFINITY };
+      }
+
       if (palavrasBase.length === 0 && !Number.isFinite(deltaMedida)) {
         return { produto: p, score: 0, deltaMedida: Number.POSITIVE_INFINITY };
       }
