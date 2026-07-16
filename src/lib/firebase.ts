@@ -23,7 +23,13 @@ const app: FirebaseApp = initializeApp(firebaseConfig);
 // So ativa se a site key estiver configurada (ver .env.example) - sem ela, nao muda nada.
 if (typeof window !== "undefined") {
   const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
-  if (appCheckSiteKey) {
+  const appCheckDebugEnabled =
+    process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_ENABLED === "true";
+  const shouldStartAppCheck =
+    Boolean(appCheckSiteKey) &&
+    (process.env.NODE_ENV === "production" || appCheckDebugEnabled);
+
+  if (shouldStartAppCheck && appCheckSiteKey) {
     if (process.env.NODE_ENV !== "production") {
       // Necessario em localhost/dev: gera um token de depuracao no console do navegador
       // que precisa ser cadastrado em Firebase Console > App Check > Gerenciar tokens de depuracao.
