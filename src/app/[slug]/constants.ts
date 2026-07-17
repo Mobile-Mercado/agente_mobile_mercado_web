@@ -1,8 +1,5 @@
 import { FLOW_STATES, FlowState } from "@/lib/buildSystemPrompt";
 
-// Chip fixo pra encaminhar a conversa pra atendimento humano (handoff manual, sob demanda).
-export const HUMAN_HANDOFF_CHIP = "🙋 Falar com atendente";
-
 // Sequência para calcular progresso da barra
 export const CHECKOUT_SEQUENCE: FlowState[] = [
   FLOW_STATES.CHECKING_SAVED_ADDRESS,
