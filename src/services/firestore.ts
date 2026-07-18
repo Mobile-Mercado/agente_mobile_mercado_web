@@ -18,6 +18,16 @@ import {
 import { db } from '@/lib/firebase';
 import { Produto, CartItem, CustomerData, FlowState, EnderecoSalvo } from '@/lib/buildSystemPrompt';
 import { UAU_MART_COMPANY_ID } from '@/config/dominios';
+import {
+  AGENTE_EXEMPLOS_COLLECTION,
+  agenteBasePath,
+  agenteConversaPath,
+  agenteConversasPath,
+  agenteMensagensPath,
+  agenteUserPath,
+  legacyAgenteConversasPath,
+  legacyAgenteMensagensPath,
+} from '@/lib/agenteFirestorePaths';
 
 export const DELIVERY_PRICE = 5.00;
 
@@ -60,7 +70,7 @@ export async function registrarCapturaDadosAgente(
   }
 }
 
-// Agrega buscas por termo em AgenteVendas/{companyId}/termosBuscados/{termoId},
+// Agrega buscas por termo em Agentes/AgenteVendas/TermosBuscadosPorEstabelecimento/{companyId}/termos/{termoId},
 // consumido pela tela "Inteligencia de Buscas" do gerenciador.
 export async function registrarBuscaAgente(
   companyId: string,
@@ -704,18 +714,22 @@ export async function salvarEnderecoDefault(
   }
 }
 
-// Estrutura:
-//   AgenteVendas/{userId}                              ← dados do usuário (nome, createdAt)
-//   AgenteVendas/{userId}/conversas/{conversaId}       ← dados da conversa
-//   AgenteVendas/{userId}/conversas/{conversaId}/mensagens/{msgId}  ← mensagens
+// Estrutura nova:
+//   Agentes/AgenteVendas/Usuarios/{userId}
+//   Agentes/AgenteVendas/Usuarios/{userId}/conversas/{conversaId}
+//   Agentes/AgenteVendas/Usuarios/{userId}/conversas/{conversaId}/mensagens/{msgId}
 const USUARIO_DOC  = (userId: string) =>
-  doc(db, 'AgenteVendas', userId);
+  doc(db, ...agenteUserPath(userId));
 const CONVERSAS_COL = (userId: string) =>
-  collection(db, 'AgenteVendas', userId, 'conversas');
+  collection(db, ...agenteConversasPath(userId));
 const CONVERSA_DOC  = (userId: string, conversaId: string) =>
-  doc(db, 'AgenteVendas', userId, 'conversas', conversaId);
+  doc(db, ...agenteConversaPath(userId, conversaId));
 const MENSAGENS_COL = (userId: string, conversaId: string) =>
-  collection(db, 'AgenteVendas', userId, 'conversas', conversaId, 'mensagens');
+  collection(db, ...agenteMensagensPath(userId, conversaId));
+const LEGACY_CONVERSAS_COL = (userId: string) =>
+  collection(db, ...legacyAgenteConversasPath(userId));
+const LEGACY_MENSAGENS_COL = (userId: string, conversaId: string) =>
+  collection(db, ...legacyAgenteMensagensPath(userId, conversaId));
 
 export type StatusConversa =
   | 'ativa'
@@ -871,27 +885,42 @@ export async function atualizarConversa(
 export async function buscarConversaAtiva(
   userId: string
 ): Promise<DadosConversa | null> {
-  const q = query(
+  const novaQuery = query(
     CONVERSAS_COL(userId),
     orderBy('startedAt', 'desc'),
     limit(20)
   );
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const ativa = snap.docs.find((d) => (d.data() as DadosConversa).status === 'ativa');
-  return ativa ? (ativa.data() as DadosConversa) : null;
+  const novaSnap = await getDocs(novaQuery);
+  const novaAtiva = novaSnap.docs.find((d) => (d.data() as DadosConversa).status === 'ativa');
+  if (novaAtiva) return novaAtiva.data() as DadosConversa;
+
+  const legacyQuery = query(
+    LEGACY_CONVERSAS_COL(userId),
+    orderBy('startedAt', 'desc'),
+    limit(20)
+  );
+  const legacySnap = await getDocs(legacyQuery);
+  const legacyAtiva = legacySnap.docs.find((d) => (d.data() as DadosConversa).status === 'ativa');
+  return legacyAtiva ? (legacyAtiva.data() as DadosConversa) : null;
 }
 
 export async function buscarMensagens(
   userId: string,
   conversaId: string
 ): Promise<DadosMensagem[]> {
-  const q = query(
+  const novaQuery = query(
     MENSAGENS_COL(userId, conversaId),
     orderBy('timestamp', 'asc')
   );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as DadosMensagem);
+  const novaSnap = await getDocs(novaQuery);
+  if (!novaSnap.empty) return novaSnap.docs.map((d) => d.data() as DadosMensagem);
+
+  const legacyQuery = query(
+    LEGACY_MENSAGENS_COL(userId, conversaId),
+    orderBy('timestamp', 'asc')
+  );
+  const legacySnap = await getDocs(legacyQuery);
+  return legacySnap.docs.map((d) => d.data() as DadosMensagem);
 }
 
 export interface MensagemExemplo {
@@ -910,7 +939,7 @@ export interface ExemploConversa {
 }
 
 const EXEMPLOS_COL = () =>
-  collection(db, 'Agentes', 'AgenteVendas', 'ExemplosConversa');
+  collection(db, ...agenteBasePath(), AGENTE_EXEMPLOS_COLLECTION);
 
 export async function salvarExemplo(
   dados: Omit<ExemploConversa, 'exemploId'>
@@ -930,11 +959,11 @@ export async function atualizarExemplo(
   exemploId: string,
   dados: Partial<Pick<ExemploConversa, 'nome' | 'ativo' | 'mensagens'>>
 ): Promise<void> {
-  await updateDoc(doc(db, 'Agentes', 'AgenteVendas', 'ExemplosConversa', exemploId), dados);
+  await updateDoc(doc(db, ...agenteBasePath(), AGENTE_EXEMPLOS_COLLECTION, exemploId), dados);
 }
 
 export async function deletarExemplo(exemploId: string): Promise<void> {
-  await deleteDoc(doc(db, 'Agentes', 'AgenteVendas', 'ExemplosConversa', exemploId));
+  await deleteDoc(doc(db, ...agenteBasePath(), AGENTE_EXEMPLOS_COLLECTION, exemploId));
 }
 
 export async function carregarExemplosAtivos(): Promise<ExemploConversa[]> {

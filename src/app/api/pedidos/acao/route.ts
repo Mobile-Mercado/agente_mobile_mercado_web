@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { admin, getAdminDb } from "@/lib/firebaseAdmin";
+import {
+  AGENTE_CAPTURE_EVENTS_COLLECTION,
+  AGENTE_CAPTURE_METRICS_COLLECTION,
+  AGENTE_VENDAS_DOC,
+  AGENTES_COLLECTION,
+  agenteCaptureEventDocId,
+} from "@/lib/agenteFirestorePaths";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -103,14 +110,18 @@ function getAgentCancelMetricRefs(
 
   const dateId = getSaoPauloDateId();
   const eventId = `${companyId}:${pedidoId}:order_canceled`.replace(/\//g, "_").slice(0, 500);
-  const root = db.collection("AgenteVendas").doc(companyId);
+  const root = db.collection(AGENTES_COLLECTION).doc(AGENTE_VENDAS_DOC);
 
   return {
     companyId,
     dateId,
     eventId,
-    eventRef: root.collection("capturasDeDados").doc(eventId),
-    metricRef: root.collection("metricasDeCapturas").doc("resumo"),
+    eventRef: root
+      .collection(AGENTE_CAPTURE_EVENTS_COLLECTION)
+      .doc(agenteCaptureEventDocId(companyId, eventId)),
+    metricRef: root
+      .collection(AGENTE_CAPTURE_METRICS_COLLECTION)
+      .doc(companyId),
     statsRefs: [
       db.collection("estabelecimentos").doc(companyId).collection("DailyStats").doc(dateId),
       db.collection("estabelecimentos").doc(companyId).collection("MonthlyStats").doc(dateId),

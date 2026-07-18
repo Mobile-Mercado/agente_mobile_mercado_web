@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { admin, getAdminDb } from "@/lib/firebaseAdmin";
 import type { AgenteCaptureEvent, AgenteCaptureEventType } from "@/services/firestore";
+import {
+  AGENTE_CAPTURE_EVENTS_COLLECTION,
+  AGENTE_CAPTURE_METRICS_COLLECTION,
+  AGENTE_FEEDBACKS_COLLECTION,
+  AGENTE_RESPONSE_TIMES_COLLECTION,
+  AGENTE_SEARCH_TERMS_COLLECTION,
+  AGENTE_SEARCH_TERMS_SUBCOLLECTION,
+  AGENTE_USERS_COLLECTION,
+  AGENTE_VENDAS_DOC,
+  AGENTES_COLLECTION,
+  agenteCaptureEventDocId,
+  agenteResponseTimeDocId,
+} from "@/lib/agenteFirestorePaths";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -43,6 +56,10 @@ function getEstablishmentStatsRefs(
     db.collection("estabelecimentos").doc(companyId).collection("MonthlyStats").doc(dateId),
     db.collection("estabelecimentos").doc(companyId).collection("Stats").doc("allTime"),
   ];
+}
+
+function getAgentRoot(db: FirebaseFirestore.Firestore): FirebaseFirestore.DocumentReference {
+  return db.collection(AGENTES_COLLECTION).doc(AGENTE_VENDAS_DOC);
 }
 
 function sanitizeEvent(value: unknown): AgenteCaptureEvent | null {
@@ -88,9 +105,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Evento invalido" }, { status: 400 });
       }
 
-      const root = db.collection("AgenteVendas").doc(event.companyId);
-      const eventRef = root.collection("capturasDeDados").doc(event.eventId);
-      const metricRef = root.collection("metricasDeCapturas").doc("resumo");
+      const root = getAgentRoot(db);
+      const eventRef = root
+        .collection(AGENTE_CAPTURE_EVENTS_COLLECTION)
+        .doc(agenteCaptureEventDocId(event.companyId, event.eventId));
+      const metricRef = root
+        .collection(AGENTE_CAPTURE_METRICS_COLLECTION)
+        .doc(event.companyId);
       const statsCounterFields = GERENCIADOR_PLUS_STATS_COUNTERS[event.eventType] ?? [];
       const dateId = getSaoPauloDateId();
       const statsRefs = statsCounterFields.length > 0
@@ -162,9 +183,11 @@ export async function POST(request: NextRequest) {
 
       const dateId = getSaoPauloDateId();
 
-      const companyRoot = db.collection("AgenteVendas").doc(companyId);
-      const eventRef = companyRoot.collection("temposResposta").doc(eventId);
-      const clientRef = db.collection("AgenteVendas").doc(userId);
+      const agentRoot = getAgentRoot(db);
+      const eventRef = agentRoot
+        .collection(AGENTE_RESPONSE_TIMES_COLLECTION)
+        .doc(agenteResponseTimeDocId(companyId, eventId));
+      const clientRef = agentRoot.collection(AGENTE_USERS_COLLECTION).doc(userId);
       const conversationRef = clientRef.collection("conversas").doc(conversationId);
       const statsRefs = getEstablishmentStatsRefs(db, companyId, dateId);
 
@@ -224,9 +247,9 @@ export async function POST(request: NextRequest) {
       }
 
       const ref = await db
-        .collection("AgenteVendas")
-        .doc(feedback.companyId)
-        .collection("notasEFeedbacks")
+        .collection(AGENTES_COLLECTION)
+        .doc(AGENTE_VENDAS_DOC)
+        .collection(AGENTE_FEEDBACKS_COLLECTION)
         .add({
           estabelecimentoId: feedback.companyId,
           visitanteId: feedback.visitorId,
@@ -262,9 +285,11 @@ export async function POST(request: NextRequest) {
       const houveResultado = Boolean(search.houveResultado);
 
       await db
-        .collection("AgenteVendas")
+        .collection(AGENTES_COLLECTION)
+        .doc(AGENTE_VENDAS_DOC)
+        .collection(AGENTE_SEARCH_TERMS_COLLECTION)
         .doc(companyId)
-        .collection("termosBuscados")
+        .collection(AGENTE_SEARCH_TERMS_SUBCOLLECTION)
         .doc(termoId)
         .set(
           {
