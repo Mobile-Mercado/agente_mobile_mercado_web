@@ -87,3 +87,59 @@ test('promocaoEstaAtiva exposta reflete o mesmo criterio', () => {
   assert.equal(promocaoEstaAtiva({ currentPrice: 10, promotionalPrice: 7 }, agora), true);
   assert.equal(promocaoEstaAtiva({ currentPrice: 10, promotionalPrice: 10 }, agora), false);
 });
+
+test('promotionStartAt com formato invalido nao derruba o preco, so a promocao', () => {
+  const dados = {
+    currentPrice:      10,
+    promotionalPrice:  7,
+    promotionStartAt:  { foo: 'bar' },
+  };
+  assert.equal(precoVigente(dados, agora), 10);
+});
+
+test('promotionEndAt com formato invalido nao derruba o preco, so a promocao', () => {
+  const dados = {
+    currentPrice:      10,
+    promotionalPrice:  7,
+    promotionEndAt:    { foo: 'bar' },
+  };
+  assert.equal(precoVigente(dados, agora), 10);
+});
+
+test('promotionStartAt serializado como _seconds/_nanoseconds e honrado', () => {
+  const dados = {
+    currentPrice:      10,
+    promotionalPrice:  7,
+    promotionStartAt:  { _seconds: Math.floor(new Date('2026-09-01T00:00:00Z').getTime() / 1000), _nanoseconds: 0 },
+    promotionEndAt:    { _seconds: Math.floor(new Date('2026-09-01T23:59:59Z').getTime() / 1000), _nanoseconds: 0 },
+  };
+  assert.equal(precoVigente(dados, agora), 7);
+});
+
+test('promotionalPrice igual a zero e ignorado', () => {
+  const preco = precoVigente({ currentPrice: 10, promotionalPrice: 0 }, agora);
+  assert.equal(preco, 10);
+});
+
+test('promotionalPrice negativo e ignorado', () => {
+  const preco = precoVigente({ currentPrice: 10, promotionalPrice: -5 }, agora);
+  assert.equal(preco, 10);
+});
+
+test('promotionStartAt igual ao momento atual conta como comecada', () => {
+  const dados = {
+    currentPrice:      10,
+    promotionalPrice:  7,
+    promotionStartAt:  timestamp(agora.toISOString()),
+  };
+  assert.equal(precoVigente(dados, agora), 7);
+});
+
+test('promotionEndAt igual ao momento atual conta como ainda valida', () => {
+  const dados = {
+    currentPrice:      10,
+    promotionalPrice:  7,
+    promotionEndAt:    timestamp(agora.toISOString()),
+  };
+  assert.equal(precoVigente(dados, agora), 7);
+});
