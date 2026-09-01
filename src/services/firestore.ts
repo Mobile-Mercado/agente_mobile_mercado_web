@@ -16,6 +16,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import precoVigente from '@/services/precoVigente';
 import { Produto, CartItem, CustomerData, FlowState, EnderecoSalvo } from '@/lib/buildSystemPrompt';
 import { UAU_MART_COMPANY_ID } from '@/config/dominios';
 import {
@@ -443,7 +444,7 @@ export async function getProducts(companyId: string): Promise<Produto[]> {
         id:            d.id,
         name:          data.name        ?? '',
         description:   data.description ?? '',
-        price:         data.currentPrice ?? data.agranelValue ?? 0,
+        price:         precoVigente(data),
         category:      data.shelves?.[0]?.categoryName          ?? 'Geral',
         categoryId:    data.shelves?.[0]?.productCategoryId     ?? '',
         subcategory:   data.shelves?.[0]?.subcategoryName       ?? '',
