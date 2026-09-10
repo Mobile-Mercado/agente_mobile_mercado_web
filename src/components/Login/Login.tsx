@@ -368,20 +368,15 @@ const Login: React.FC<LoginProps> = ({ redirectTo = '/' }) => {
       <div
         id="recaptcha-container"
         style={{
-          // Sem transform aqui: o Google injeta o .grecaptcha-badge (position:fixed)
-          // dentro deste container. Um transform no container viraria o "containing
-          // block" do badge e ele some da tela (ver mesma correcao em [slug]/page.tsx).
-          // A centralizacao usa calc() e o tamanho/escala real do selo vem do CSS
-          // global .grecaptcha-badge (globals.css).
           position: "fixed",
-          left: "calc(50% - 130px)",
-          bottom: 18,
-          width: 260,
-          minHeight: 60,
-          overflow: "visible",
-          opacity: 1,
-          zIndex: 9999,
-          pointerEvents: "auto",
+          top: 0,
+          right: 0,
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          opacity: 0,
+          zIndex: -1,
+          pointerEvents: "none",
         }}
       />
 

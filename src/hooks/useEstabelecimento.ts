@@ -22,7 +22,7 @@ interface UseEstabelecimentoResult {
 /**
  * companyId   — ID do slug atual (usado para nome/logo: overrides ou Firestore próprio)
  * dataCompanyId — ID de onde vêm os dados (config, formas de pagamento, info de entrega)
- *                 Pode ser diferente quando o estabelecimento usa dados de outro (ex: Vidal → UAU Mart)
+ *                 Pode ser diferente quando o estabelecimento temporariamente usa dados de outro
  */
 export function useEstabelecimento(companyId: string, dataCompanyId?: string): UseEstabelecimentoResult {
   const srcId = dataCompanyId ?? companyId;

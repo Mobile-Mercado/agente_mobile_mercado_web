@@ -137,14 +137,23 @@ a {
 .font-semibold { font-weight: var(--font-weight-semibold); }
 .font-bold { font-weight: var(--font-weight-bold); }
 
+/* Badge do reCAPTCHA - fixado no canto inferior direito, sem interceptar cliques */
 .grecaptcha-badge {
   visibility: visible !important;
-  opacity: 1 !important;
-  bottom: 18px !important;
+  opacity: 0.8 !important;
+  position: fixed !important;
+  bottom: 80px !important;
   top: auto !important;
-  right: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) scale(0.7) !important;
-  transform-origin: bottom center !important;
-  z-index: 9998 !important;
+  right: 12px !important;
+  left: auto !important;
+  transform: scale(0.7) !important;
+  transform-origin: bottom right !important;
+  z-index: 100 !important;
+  pointer-events: none !important;
+}
+
+/* Garante que o texto do placeholder nunca intercepte cliques nem seleção de texto */
+::placeholder {
+  pointer-events: none !important;
+  user-select: none !important;
 }

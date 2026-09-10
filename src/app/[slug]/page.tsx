@@ -911,14 +911,19 @@ const AgentePage: React.FC = () => {
   };
 
   const handleAuthVerifyCode = async () => {
-    if (authCode.length !== 6) return;
+    if (authCode.length !== 6) {
+      setAuthCodeError('Digite os 6 dígitos do código.');
+      return;
+    }
     if (!authAcceptTerms) {
+      const errorMsg = 'Para continuar, marque "Li e aceito os Termos de Uso e a Política de Privacidade".';
+      setAuthCodeError(errorMsg);
       setMensagens(prev => [
         ...prev.filter(m => m.id !== 'auth-code-error'),
         {
           id: 'auth-code-error',
           role: 'assistant',
-          content: 'Para continuar, marque "Li e aceito os Termos de Uso e a PolÃ­tica de Privacidade".',
+          content: errorMsg,
           timestamp: new Date(),
         },
       ]);
@@ -973,9 +978,11 @@ const AgentePage: React.FC = () => {
         'firebase-admin-unavailable': 'Login indisponível neste servidor no momento.',
         'token-error': 'Não foi possível concluir o login. Tente novamente.',
       };
+      const errorMsg = msgs[err.code ?? ''] ?? 'Não foi possível verificar. Tente novamente.';
+      setAuthCodeError(errorMsg);
       setMensagens(prev => [
         ...prev.filter(m => m.id !== 'auth-code-error'),
-        { id: 'auth-code-error', role: 'assistant', content: msgs[err.code ?? ''] ?? 'Não foi possível verificar. Tente novamente.', timestamp: new Date() },
+        { id: 'auth-code-error', role: 'assistant', content: errorMsg, timestamp: new Date() },
       ]);
     } finally { setAuthSending(false); }
   };
@@ -2759,11 +2766,10 @@ const AgentePage: React.FC = () => {
         key={recaptchaContainerKey}
         id="recaptcha-container"
         style={recaptchaVisivel ? {
-          // Modo visivel (checkbox do reCAPTCHA): o widget do Google e' renderizado
-          // em fluxo normal dentro deste container, entao um transform aqui e' seguro.
+          // Modo visivel (checkbox do reCAPTCHA): exibido acima da barra inferior
           position: 'fixed',
           left: '50%',
-          bottom: 18,
+          bottom: 90,
           zIndex: 9999,
           width: 'min(304px, calc(100vw - 24px))',
           minHeight: 78,
@@ -2777,26 +2783,17 @@ const AgentePage: React.FC = () => {
           padding: 10,
           pointerEvents: 'auto',
         } : {
-          // Modo invisivel (selo "protegido por reCAPTCHA"): o Google injeta o
-          // .grecaptcha-badge com position:fixed DENTRO deste container. Um transform
-          // aqui viraria o "containing block" do badge (regra do CSS: transform em um
-          // ancestral tira o position:fixed do fluxo do viewport), fazendo o selo herdar
-          // e somar a escala/posicao deste elemento e sumir da tela. Por isso a centralizacao
-          // usa calc() em vez de transform: translateX — a posicao final do selo em si
-          // e' controlada pela regra global .grecaptcha-badge em globals.css.
+          // Modo invisivel: nunca deve bloquear cliques ou cobrir a barra de digitacao
           position: 'fixed',
-          left: 'calc(50% - 130px)',
-          bottom: 18,
-          zIndex: 9999,
-          width: 260,
-          minHeight: 60,
-          overflow: 'visible',
-          opacity: 1,
+          top: 0,
+          right: 0,
+          zIndex: -1,
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          opacity: 0,
           background: 'transparent',
-          borderRadius: 0,
-          boxShadow: 'none',
-          padding: 0,
-          pointerEvents: 'auto',
+          pointerEvents: 'none',
         }}
       />
       <Header
@@ -3039,6 +3036,10 @@ const AgentePage: React.FC = () => {
                   onResend={handleAuthResend}
                   showEmailFallback={authStep === 'code_modal'}
                   onEmailFallbackClick={handleShowEmailFallback}
+                  code={authCode}
+                  onChangeCode={(val) => { setAuthCode(val); setAuthCodeError(''); }}
+                  onSubmitCode={handleAuthVerifyCode}
+                  codeError={authCodeError}
                 />
               ) : msg.emailPasswordCard ? (
                 <EmailPasswordCard
@@ -3334,7 +3335,15 @@ const AgentePage: React.FC = () => {
 
       {/* Barra inferior: input + info strip */}
       <div className={styles.bottomBar}>
-      <div className={styles.inputContainer}>
+      <div
+        className={styles.inputContainer}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+            inputRef.current?.focus();
+            textareaRef.current?.focus();
+          }
+        }}
+      >
         {precisaLogin ? (
           authStep === 'email' ? null : (
           <input
@@ -3342,9 +3351,17 @@ const AgentePage: React.FC = () => {
             type={authStep !== 'code_modal' ? "tel" : "text"}
             inputMode={authStep === 'code_modal' ? "numeric" : undefined}
             maxLength={authStep === 'code_modal' ? 6 : undefined}
-            placeholder={authStep === 'code_modal' ? "000000" : authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "(11) 99999-9999"}
+            placeholder={authStep === 'code_modal' ? (authCode ? "" : "Digite o código SMS...") : authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "(11) 99999-9999"}
             className={styles.messageInput}
-            style={authStep === 'code_modal' ? { letterSpacing: '0.4em', textAlign: 'center', fontSize: '1.1rem', fontWeight: 700 } : undefined}
+            style={authStep === 'code_modal' ? {
+              letterSpacing: authCode ? '0.35em' : 'normal',
+              textAlign: authCode ? 'center' : 'left',
+              fontSize: authCode ? '1.25rem' : '0.95rem',
+              fontWeight: authCode ? 700 : 400,
+              caretColor: '#193281',
+              color: '#0f172a',
+              cursor: 'text',
+            } : undefined}
             value={authStep === 'code_modal' ? authCode : authPhone}
             onChange={(e) => {
               if (authStep === 'code_modal') { setAuthCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setAuthCodeError(''); }

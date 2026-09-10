@@ -23,7 +23,7 @@ export const SLUG_PARA_COMPANY_ID: Record<string, string> = Object.fromEntries(
 // Redirecionamento temporário de dados: companyId → ID real usado nas queries
 // Use quando o estabelecimento ainda não tem dados próprios no Firestore
 export const COMPANY_DATA_SOURCE: Record<string, string> = {
-  XAXMOP6aweRbBAb0gUvU: UAU_MART_COMPANY_ID,
+  // XAXMOP6aweRbBAb0gUvU (Vidal) agora tem catálogo próprio sincronizado via VR Software
 };
 
 // Logos locais por companyId (sobrescrevem o Firestore)
