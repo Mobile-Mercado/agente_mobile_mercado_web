@@ -152,8 +152,9 @@ a {
   pointer-events: none !important;
 }
 
-/* Garante que o texto do placeholder nunca intercepte cliques nem seleção de texto */
+/* Garante que o texto do placeholder fique sempre centralizado e nunca intercepte cliques */
 ::placeholder {
+  text-align: center !important;
   pointer-events: none !important;
   user-select: none !important;
 }

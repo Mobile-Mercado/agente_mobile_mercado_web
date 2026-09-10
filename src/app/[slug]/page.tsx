@@ -2757,6 +2757,18 @@ const AgentePage: React.FC = () => {
 
   const precisaLogin = !isGuestMode && (!user || user.isAnonymous) && !loginCompleto;
 
+  // Foco automático e imediato no input ativo ao alternar telas/etapas
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (precisaLogin) {
+        inputRef.current?.focus();
+      } else {
+        textareaRef.current?.focus();
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [precisaLogin, authStep]);
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -3334,12 +3346,24 @@ const AgentePage: React.FC = () => {
 
 
       {/* Barra inferior: input + info strip */}
-      <div className={styles.bottomBar}>
+      <div
+        className={styles.bottomBar}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          if (precisaLogin) {
+            inputRef.current?.focus();
+          } else {
+            textareaRef.current?.focus();
+          }
+        }}
+      >
       <div
         className={styles.inputContainer}
         onClick={(e) => {
-          if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+          if ((e.target as HTMLElement).closest('button')) return;
+          if (precisaLogin) {
             inputRef.current?.focus();
+          } else {
             textareaRef.current?.focus();
           }
         }}
@@ -3349,19 +3373,20 @@ const AgentePage: React.FC = () => {
           <input
             ref={inputRef}
             type={authStep !== 'code_modal' ? "tel" : "text"}
-            inputMode={authStep === 'code_modal' ? "numeric" : undefined}
-            maxLength={authStep === 'code_modal' ? 6 : undefined}
+            inputMode={authStep === 'code_modal' ? "numeric" : "tel"}
+            maxLength={authStep === 'code_modal' ? 6 : 15}
             placeholder={authStep === 'code_modal' ? (authCode ? "" : "Digite o código SMS...") : authSmsCooldownMs > 0 ? `Aguarde ${authSmsCooldownLabel}` : "(11) 99999-9999"}
             className={styles.messageInput}
-            style={authStep === 'code_modal' ? {
-              letterSpacing: authCode ? '0.35em' : 'normal',
-              textAlign: authCode ? 'center' : 'left',
-              fontSize: authCode ? '1.25rem' : '0.95rem',
-              fontWeight: authCode ? 700 : 400,
+            style={{
+              textAlign: 'center',
+              letterSpacing: (authStep === 'code_modal' && authCode) ? '0.35em' : 'normal',
+              fontSize: (authStep === 'code_modal' && authCode) ? '1.25rem' : '1.05rem',
+              fontWeight: (authStep === 'code_modal' && authCode) ? 700 : 500,
               caretColor: '#193281',
               color: '#0f172a',
               cursor: 'text',
-            } : undefined}
+              width: '100%',
+            }}
             value={authStep === 'code_modal' ? authCode : authPhone}
             onChange={(e) => {
               if (authStep === 'code_modal') { setAuthCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setAuthCodeError(''); }
@@ -3383,6 +3408,12 @@ const AgentePage: React.FC = () => {
             rows={1}
             placeholder={!produtosCarregados ? "Carregando produtos..." : transcrevendo ? "Transcrevendo..." : gravando ? "Gravando..." : "Digite sua mensagem..."}
             className={styles.messageTextarea}
+            style={{
+              textAlign: !inputText ? 'center' : (inputText.includes('\n') || inputText.length > 40 ? 'left' : 'center'),
+              caretColor: '#193281',
+              cursor: 'text',
+              width: '100%',
+            }}
             value={inputText}
             onChange={(e) => {
               setInputText(e.target.value);
