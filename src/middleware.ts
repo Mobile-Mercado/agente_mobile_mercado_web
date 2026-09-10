@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BYPASS = ["/_next", "/api", "/favicon", "/logo", "/prodSemImg"];
+const BYPASS = ["/_next", "/api", "/favicon", "/logo", "/prodSemImg", "/declaracao-de-privacidade", "/termos-de-uso", "/termos"];
 
 // Dominio canonico do app. O dominio padrao do Render (*.onrender.com) continua
 // acessivel mesmo depois de configurar um dominio proprio. Manter um unico

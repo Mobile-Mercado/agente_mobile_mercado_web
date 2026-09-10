@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Móbile Supermercados Online — Apresentação e Termos</title>
+  <meta name="description" content="Conheça o Móbile Supermercados Online, a plataforma de supermercados digitais da sua cidade." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      background-color: #f8fafc;
+      color: #1e293b;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #193281;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 2px 6px rgba(25, 50, 129, 0.25);
+    }
+    .brand-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .brand-sub {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .back-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .content-container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 20px 80px;
+    }
+    .hero-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      padding: 36px 30px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+      margin-bottom: 28px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #eef2ff;
+      color: #193281;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      margin-bottom: 14px;
+    }
+    .main-title {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .hero-subtitle {
+      font-size: 1.1rem;
+      color: #334155;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+    .lead-text {
+      color: #475569;
+      font-size: 0.98rem;
+      line-height: 1.65;
+      margin-bottom: 14px;
+    }
+    .partner-banner {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e0edfd 100%);
+      border: 1px solid #bae6fd;
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-top: 24px;
+    }
+    .partner-banner-text {
+      font-size: 0.92rem;
+      color: #0369a1;
+      line-height: 1.55;
+    }
+    .partner-banner-text strong {
+      color: #0c4a6e;
+    }
+    .partner-banner-text a {
+      color: #0284c7;
+      font-weight: 700;
+      text-decoration: underline;
+    }
+    .section-header {
+      margin: 36px 0 20px;
+      text-align: center;
+    }
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .section-sub {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .motivos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .motivo-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+      display: flex;
+      gap: 14px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .motivo-card:hover {
+      transform: translateY(-2px);
+      border-color: #cbd5e1;
+    }
+    .motivo-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #193281;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .motivo-content {
+      font-size: 0.93rem;
+      color: #334155;
+      line-height: 1.55;
+    }
+    .motivo-content strong {
+      color: #0f172a;
+    }
+    .full-motivo-card {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #94a3b8;
+    }
+    .payment-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      padding: 24px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .payment-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #ecfdf5;
+      color: #059669;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .payment-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #065f46;
+      margin-bottom: 4px;
+    }
+    .payment-desc {
+      font-size: 0.92rem;
+      color: #475569;
+    }
+    .franchise-card {
+      background: linear-gradient(135deg, #193281 0%, #1e3a8a 100%);
+      color: #ffffff;
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: 0 10px 25px -5px rgba(25, 50, 129, 0.3);
+      margin-top: 32px;
+    }
+    .franchise-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .franchise-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 10px;
+    }
+    .franchise-desc {
+      font-size: 0.95rem;
+      color: #e2e8f0;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .franchise-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      color: #193281;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .franchise-btn:hover {
+      background: #f1f5f9;
+      transform: translateY(-1px);
+    }
+    .footer-note {
+      text-align: center;
+      padding: 40px 20px 20px;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    @media (max-width: 640px) {
+      .top-bar { padding: 12px 16px; }
+      .content-container { padding: 20px 14px 60px; }
+      .hero-card { padding: 24px 18px; }
+      .main-title { font-size: 1.6rem; }
+      .motivos-grid { grid-template-columns: 1fr; }
+      .franchise-card { padding: 24px 18px; }
+      .payment-card { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand-wrap">
+      <div class="brand-logo">M</div>
+      <div>
+        <div class="brand-title">Móbile Supermercados Online</div>
+        <div class="brand-sub">Marketplace &amp; Termos da Plataforma</div>
+      </div>
+    </div>
+    <a href="/" class="back-btn">
+      ← Voltar à Loja
+    </a>
+  </header>
+
+  <main class="content-container">
+    <section class="hero-card">
+      <div class="badge">Supermercados Digitais</div>
+      <h1 class="main-title">MÓBILE SUPERMERCADOS ONLINE</h1>
+
+      <p class="hero-subtitle">
+        No <strong>Móbile Supermercados Online</strong> você encontra as melhores mercearias, padarias, açougues, hortifrutis e supermercados da sua cidade na palma de sua mão!
+      </p>
+
+      <p class="lead-text">
+        O Móbile é um aplicativo de supermercados digitais, ou seja, todos os supermercados têm seus produtos disponibilizados online através de uma plataforma de marketplace.
+      </p>
+
+      <p class="lead-text">
+        De forma rápida, você escolhe seus mercados favoritos e faz seus pedidos e compras com muita tranquilidade!
+      </p>
+
+      <p class="lead-text">
+        Todos os nossos parceiros estão prontos para organizar e entregar as suas compras do jeito que você gosta!
+      </p>
+
+      <div class="partner-banner">
+        <div class="partner-banner-text">
+          <strong>Não encontrou seu mercado favorito?</strong> Que tal ganhar um mega bônus indicando ele pra nós? Basta enviar um e-mail para:
+          <a href="mailto:mobile@mobilesupermercados.com.br">mobile@mobilesupermercados.com.br</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-header">
+      <h2 class="section-title">Principais Motivos para Usar o Móbile Supermercados</h2>
+      <p class="section-sub">Praticidade, economia e segurança para o seu dia a dia</p>
+    </div>
+
+    <div class="motivos-grid">
+      <div class="motivo-card">
+        <div class="motivo-number">1</div>
+        <div class="motivo-content">
+          <strong>Chega de carregar peso:</strong> Esqueça o esforço de empurrar carrinhos pesados e carregar sacolas cheias. A gente cuida de tudo!
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">2</div>
+        <div class="motivo-content">
+          <strong>Conforto do seu lar:</strong> Receba suas compras com total comodidade e segurança na porta da sua casa.
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">3</div>
+        <div class="motivo-content">
+          <strong>Economia de tempo:</strong> Pra quê perder 2h ou 3h fazendo compras? Isto não faz mais sentido em tempos onde o tempo está cada vez mais valioso!
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">4</div>
+        <div class="motivo-content">
+          <strong>Economia de transporte:</strong> Economize gasolina ou despesas com transporte! Aquele stress no trânsito, ninguém merece...
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">5</div>
+        <div class="motivo-content">
+          <strong>Zero filas:</strong> Gosta de pegar filas intermináveis nos caixas? Definitivamente, a gente também não.
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">6</div>
+        <div class="motivo-content">
+          <strong>Mais segurança:</strong> Riscos no trânsito com acidentes, chuva e outros imprevistos aqui não acontecem.
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">7</div>
+        <div class="motivo-content">
+          <strong>Entrega agendada:</strong> Faça o agendamento da entrega das suas compras para os horários mais convenientes da sua rotina.
+        </div>
+      </div>
+
+      <div class="motivo-card">
+        <div class="motivo-number">8</div>
+        <div class="motivo-content">
+          <strong>Atendimento direto e fácil:</strong> Tem algo errado com a sua compra? Você fala diretamente com o seu mercado através do chat exclusivo. É muito fácil resolver e você ainda é muito bem atendido!
+        </div>
+      </div>
+
+      <div class="motivo-card full-motivo-card">
+        <div class="motivo-number">9</div>
+        <div class="motivo-content">
+          <strong>Controle total das suas compras:</strong> Já reparou que a gente sempre gasta mais que o necessário quando vai aos supermercados? No Móbile Supermercados você tem a opção de controlar facilmente o volume de compras. E sabe o que é melhor? Esqueceu de algum item? É só comprar de novo! Sem problemas, sem dor de cabeça, sem stress e ainda economizando uma barbaridade!
+        </div>
+      </div>
+    </div>
+
+    <div class="payment-card">
+      <div class="payment-icon-wrap">💳</div>
+      <div>
+        <div class="payment-title">Opções Flexíveis de Pagamento</div>
+        <div class="payment-desc">
+          No Móbile Supermercados Digitais você tem opções de pagar diretamente no momento da entrega, com <strong>dinheiro</strong> ou <strong>cartão</strong>, além das formas online disponíveis por cada estabelecimento parceiro.
+        </div>
+      </div>
+    </div>
+
+    <div class="payment-card">
+      <div class="payment-icon-wrap" style="background: #fef3c7; color: #b45309;">😊</div>
+      <div>
+        <div class="payment-title" style="color: #92400e;">Baixe e fique de boa em casa com a família!</div>
+        <div class="payment-desc">
+          Em outras palavras, baixe aí e depois nos conta o que achou! Se tiver alguma coisa que precise ser melhorada, é só nos enviar pelo e-mail:
+          <a href="mailto:mobile@supermercadomobile.com.br" style="color: #193281; font-weight: 600; text-decoration: underline;">
+            mobile@supermercadomobile.com.br
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <section class="franchise-card">
+      <div class="franchise-badge">Oportunidade de Negócio</div>
+      <h2 class="franchise-title">Não tem Móbile Supermercados em sua cidade?</h2>
+      <p class="franchise-desc">
+        Quem sabe você seja o empreendedor que estamos buscando para levar uma franquia nossa aí para a sua cidade? Vamos conversar sem compromisso para você conhecer este negócio incrível?
+      </p>
+      <a href="mailto:franquias@supermercadomobile.com.br" class="franchise-btn">
+        ✉ Falar com o time de Franquias
+      </a>
+    </section>
+
+    <footer class="footer-note">
+      © 2026 Móbile Supermercados Online. Todos os direitos reservados.
+    </footer>
+  </main>
+</body>
+</html>

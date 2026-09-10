@@ -350,11 +350,11 @@ const PhoneAuthInline: React.FC<PhoneAuthInlineProps> = () => {
                     className={styles.checkbox}
                   />
                   Li e aceito os{" "}
-                  <a href="#" className={styles.termsLink} target="_blank" rel="noopener">
+                  <a href="/termos-de-uso" className={styles.termsLink} target="_blank" rel="noopener noreferrer">
                     Termos de Uso
                   </a>{" "}
                   e a{" "}
-                  <a href="https://www.mobilemercado.com.br/declaracao-de-privacidade" className={styles.termsLink} target="_blank" rel="noopener noreferrer">
+                  <a href="/declaracao-de-privacidade" className={styles.termsLink} target="_blank" rel="noopener noreferrer">
                     Política de Privacidade
                   </a>
                 </label>

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Declaração de Privacidade — Móbile Supermercados Digitais</title>
+  <meta name="description" content="Declaração de Privacidade e Proteção de Dados da Plataforma Móbile Supermercados Digitais." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      background-color: #f8fafc;
+      color: #1e293b;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #193281;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 2px 6px rgba(25, 50, 129, 0.25);
+    }
+    .brand-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .brand-sub {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .back-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .content-container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 20px 80px;
+    }
+    .hero-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      padding: 32px 28px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+      margin-bottom: 28px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #eef2ff;
+      color: #193281;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      margin-bottom: 14px;
+    }
+    .main-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+    .update-date {
+      font-size: 0.9rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+    .intro-highlight {
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 100%);
+      border-left: 4px solid #193281;
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      color: #1e293b;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .intro-text {
+      color: #475569;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      margin-bottom: 12px;
+    }
+    .index-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      padding: 20px 24px;
+      margin-bottom: 32px;
+    }
+    .index-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .index-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px 16px;
+    }
+    .index-link {
+      color: #193281;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      transition: color 0.15s ease;
+    }
+    .index-link:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+    .section-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      padding: 26px 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+      scroll-margin-top: 90px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .section-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #193281;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .section-body {
+      font-size: 0.93rem;
+      color: #334155;
+      line-height: 1.7;
+    }
+    .section-body p {
+      margin-bottom: 12px;
+    }
+    .section-body p:last-child {
+      margin-bottom: 0;
+    }
+    .sub-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 10px 0;
+    }
+    .sub-item-title {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+    .sub-item-desc {
+      color: #475569;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .highlight-contact {
+      background: linear-gradient(135deg, #193281 0%, #1e3a8a 100%);
+      color: #ffffff;
+      border-radius: 14px;
+      padding: 28px;
+      margin-top: 32px;
+      box-shadow: 0 10px 25px -5px rgba(25, 50, 129, 0.3);
+    }
+    .highlight-contact-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+    .highlight-contact-desc {
+      font-size: 0.95rem;
+      color: #e2e8f0;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+    .email-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .email-pill:hover {
+      background: #ffffff;
+      color: #193281;
+    }
+    .footer-note {
+      text-align: center;
+      padding: 40px 20px 20px;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    @media (max-width: 640px) {
+      .top-bar { padding: 12px 16px; }
+      .content-container { padding: 20px 14px 60px; }
+      .hero-card { padding: 22px 18px; }
+      .main-title { font-size: 1.5rem; }
+      .section-card { padding: 20px 18px; }
+      .index-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand-wrap">
+      <div class="brand-logo">M</div>
+      <div>
+        <div class="brand-title">Móbile Supermercados Digitais</div>
+        <div class="brand-sub">Privacidade &amp; Proteção de Dados</div>
+      </div>
+    </div>
+    <a href="/" class="back-btn">
+      ← Voltar à Loja
+    </a>
+  </header>
+
+  <main class="content-container">
+    <div class="hero-card">
+      <div class="badge">LGPD &amp; Proteção de Dados</div>
+      <h1 class="main-title">Declaração de Privacidade</h1>
+      <div class="update-date">Atualizado: 07 de Abril de 2021</div>
+
+      <div class="intro-highlight">
+        <strong>Compromisso de Segurança:</strong> Os seus dados são coletados principalmente para garantir que seja você a pessoa que realmente esteja fazendo os pedidos e não outra em seu lugar.
+      </div>
+
+      <p class="intro-text">
+        Respeitamos a sua privacidade e recomendamos que conheça todas as nossas práticas para entender como a proteção dos seus dados é importante para o Móbile Supermercados Digitais.
+      </p>
+      <p class="intro-text">
+        Sobre a utilização dos seus dados, faz parte da nossa missão entender, compreender e desenvolver um serviço que proporciona uma experiência cada vez melhor e mais agradável. Aqui a gente descreve como obtemos os dados e armazenamos para utilizar e compartilhar as suas informações.
+      </p>
+    </div>
+
+    <nav class="index-card" aria-label="Índice de seções">
+      <div class="index-title">Tópicos da Declaração</div>
+      <div class="index-grid">
+        <a href="#secao-1" class="index-link">1. A quem se aplica</a>
+        <a href="#secao-2" class="index-link">2. Dados coletados e uso</a>
+        <a href="#secao-3" class="index-link">3. Melhoria dos serviços</a>
+        <a href="#secao-4" class="index-link">4. Avisos e Notificações</a>
+        <a href="#secao-5" class="index-link">5. Marketing e promoções</a>
+        <a href="#secao-6" class="index-link">6. Suporte e segurança</a>
+        <a href="#secao-7" class="index-link">7. Cookies e tecnologias</a>
+        <a href="#secao-8" class="index-link">8. Armazenamento de dados</a>
+        <a href="#secao-9" class="index-link">9. Compartilhamento parceiros</a>
+        <a href="#secao-10" class="index-link">10. Autoridades</a>
+        <a href="#secao-11" class="index-link">11. Proteção e mudanças</a>
+        <a href="#secao-12" class="index-link">12. Como exercer seus direitos</a>
+      </div>
+    </nav>
+
+    <article id="secao-1" class="section-card">
+      <div class="section-header">
+        <div class="section-number">1</div>
+        <h2 class="section-title">A quem essa Declaração de Privacidade se aplica?</h2>
+      </div>
+      <div class="section-body">
+        <p>Esta Declaração é aplicável a todos que acessarem, se cadastrarem e utilizarem os serviços da <strong>Plataforma Móbile Supermercados Digitais</strong>.</p>
+        <p>Sempre que mencionamos a palavra <strong>“Plataforma”</strong> estamos nos referindo ao nosso aplicativo e site que oferecem juntos todos os nossos serviços.</p>
+        <p>Sempre que mencionamos os termos <strong>“você”</strong>, <strong>“seu”</strong> ou <strong>“sua”</strong>, estamos nos referindo diretamente a Você que se cadastrou ou se cadastrará como usuário da nossa Plataforma.</p>
+      </div>
+    </article>
+
+    <article id="secao-2" class="section-card">
+      <div class="section-header">
+        <div class="section-number">2</div>
+        <h2 class="section-title">Quais dados coletamos e como são utilizados?</h2>
+      </div>
+      <div class="section-body">
+        <p>Quando você acessa, se cadastra e cria uma conta para utilizar a Plataforma Móbile Supermercados Digitais, poderemos obter várias informações sobre você, como:</p>
+
+        <div class="sub-item">
+          <div class="sub-item-title">• Dados de perfil</div>
+          <div class="sub-item-desc">
+            Nome, CPF (opcional ou obrigatório quando utilizado por estabelecimentos para fins fiscais), e-mail, endereço de entrega, telefone e outros tipos de contato. Caso você se cadastre utilizando sua conta do Facebook, estará permitindo que o Móbile Supermercados Digitais acesse as informações pessoais, que são as mesmas disponíveis de acordo com as suas configurações de privacidade no Facebook.
+          </div>
+        </div>
+
+        <div class="sub-item">
+          <div class="sub-item-title">• Dados de localização para a entrega do pedido</div>
+          <div class="sub-item-desc">
+            É necessário que você nos forneça o endereço de entrega do pedido manualmente, mas também podemos coletar dados através da sua localização automaticamente via GPS/WIFI do seu dispositivo que estiver utilizando para acessar o Móbile Supermercados Digitais para obter dados como: IP, tipo de navegador, versão do sistema operacional, provedor de Internet (ISP), páginas de busca, data, horário, sequência de cliques, marca do dispositivo, operadora, versão do aparelho e do aplicativo e informações de acessibilidade do aparelho e redes de internet. A localização fornecida fará parte do seu cadastro.
+          </div>
+        </div>
+
+        <div class="sub-item">
+          <div class="sub-item-title">• Dados gerados durante o uso da Plataforma</div>
+          <div class="sub-item-desc">
+            Número de interações na Plataforma, datas, horários, acessos, detalhes dos pedidos já realizados, valores, distância entre você e o estabelecimento e o local de entrega escolhido e as formas de pagamento.
+          </div>
+        </div>
+
+        <div class="sub-item">
+          <div class="sub-item-title">• Dados de intermediação de comunicação entre usuários e estabelecimentos</div>
+          <div class="sub-item-desc">
+            Conteúdo das mensagens enviadas e recebidas via chat da Plataforma, incluindo textos, data e hora.
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article id="secao-3" class="section-card">
+      <div class="section-header">
+        <div class="section-number">3</div>
+        <h2 class="section-title">Como utilizamos os seus dados para melhorar os nossos serviços e produtos?</h2>
+      </div>
+      <div class="section-body">
+        <p>Além de serem utilizados para aprimorar, melhorar e personalizar sua conta e serviços para você, seus dados são utilizados para operações internas na entrega dos pedidos pelos estabelecimentos onde você comprou.</p>
+        <p>Com o objetivo de melhorar os serviços, seus dados pessoais também são utilizados para análise de informações e análises estatísticas de uso.</p>
+        <p>Sempre que envia feedback e avalia a nossa Plataforma através das estrelinhas e comentários, ou sobre os serviços dos estabelecimentos, nós podemos utilizar estas avaliações de feedback incluindo os comentários para publicar, analisar, processar e tratar essa interação identificando você através do seu cadastro.</p>
+      </div>
+    </article>
+
+    <article id="secao-4" class="section-card">
+      <div class="section-header">
+        <div class="section-number">4</div>
+        <h2 class="section-title">Avisos e Notificações</h2>
+      </div>
+      <div class="section-body">
+        <p>Enviamos avisos e notificações sobre compras, mudanças e melhorias, condições e políticas. Você poderá gerenciar as opções disponíveis de comunicação direto pelo aplicativo, desde já concordando e nos autorizando a utilização.</p>
+      </div>
+    </article>
+
+    <article id="secao-5" class="section-card">
+      <div class="section-header">
+        <div class="section-number">5</div>
+        <h2 class="section-title">Marketing e promoções</h2>
+      </div>
+      <div class="section-body">
+        <p>Você nos autoriza o envio de publicidade, materiais promocionais, novidades, e direcionamento de marketing em redes sociais, notificações push e a compartilhar as informações necessárias para os parceiros e estabelecimentos que operam no Móbile Supermercados Digitais, que possuem política de privacidade e de proteção equivalente ao descrito nesta declaração.</p>
+        <p>Utilizamos seus dados também para entrar em contato diretamente para fazer pesquisas importantes para nos ajudar a criar melhorias, mas você poderá recusar sua participação quando questionado.</p>
+      </div>
+    </article>
+
+    <article id="secao-6" class="section-card">
+      <div class="section-header">
+        <div class="section-number">6</div>
+        <h2 class="section-title">Suporte, atendimento e segurança</h2>
+      </div>
+      <div class="section-body">
+        <p>Sempre que você precisar de “ajuda” e solicitar atendimento e suporte sobre qualquer problema na Plataforma, podemos utilizar seus dados para: evitar fraudes e verificar se é você que acessou ou solicitou o atendimento; encaminhar suas dúvidas e problemas para o nosso setor responsável por monitorar e melhorar nossos serviços.</p>
+      </div>
+    </article>
+
+    <article id="secao-7" class="section-card">
+      <div class="section-header">
+        <div class="section-number">7</div>
+        <h2 class="section-title">Como utilizamos cookies e tecnologias similares</h2>
+      </div>
+      <div class="section-body">
+        <p>Tanto a Móbile Supermercados Digitais quanto seus parceiros e estabelecimentos contam com a utilização de tecnologias como cookies (pequenos arquivos armazenados diretamente no seu dispositivo ou navegador), pixel tags (pequenos códigos utilizados para “ler”, armazenar e transmitir informações de IP e horários) ou tecnologias semelhantes que nos ajudam, de formas diferentes, a autenticar contas e na personalização da sua experiência em todos os sentidos quando utiliza a nossa Plataforma.</p>
+        <p>Por exemplo, quando a Plataforma personaliza uma mensagem de boas-vindas com o seu nome. O uso destas tecnologias também faz com que todos os nossos conteúdos publicitários sejam mais relevantes de acordo com os seus interesses, além de usar essas informações para classificar e identificar os usuários de acordo com o uso da Plataforma.</p>
+        <p>Estas tecnologias nos ajudam a analisar tendências, aprender sobre o comportamento dos usuários e também com informações demográficas de maneira geral em nossa base de dados. Podemos permitir que terceiros contratados pelo Móbile Supermercados Digitais como: <a href="https://www.facebook.com/about/privacy/" target="_blank" rel="noopener noreferrer" style="color: #193281; font-weight: 600; text-decoration: underline;">Facebook</a> e <a href="https://policies.google.com/technologies/partner-sites?hl=pt-BR" target="_blank" rel="noopener noreferrer" style="color: #193281; font-weight: 600; text-decoration: underline;">Google Analytics</a> utilizem também estas tecnologias por meio de compartilhamento de dados conosco.</p>
+      </div>
+    </article>
+
+    <article id="secao-8" class="section-card">
+      <div class="section-header">
+        <div class="section-number">8</div>
+        <h2 class="section-title">Como, onde e por quanto tempo os dados são armazenados</h2>
+      </div>
+      <div class="section-body">
+        <p>Os dados são armazenados em serviços de nuvem confiáveis que empregam alto nível de segurança, contratados dentro ou fora do Brasil.</p>
+        <p>O Móbile Supermercados Digitais armazena as suas informações até que você solicite a exclusão de sua conta. Em algumas hipóteses de guarda obrigatória de registros previstas em leis aplicáveis, podemos manter os seus dados armazenados.</p>
+      </div>
+    </article>
+
+    <article id="secao-9" class="section-card">
+      <div class="section-header">
+        <div class="section-number">9</div>
+        <h2 class="section-title">Como os dados são compartilhados entre estabelecimentos e parceiros</h2>
+      </div>
+      <div class="section-body">
+        <p>Por razões diversas e de necessidades, os dados podem ou não serem compartilhados pelo Móbile Supermercados Digitais para parceiros, estabelecimentos e prestadores de serviços terceirizados que por sua vez terão o mesmo dever contratual de proteção dos termos de Privacidade do Móbile Supermercados Digitais para garantir o cumprimento dos nossos padrões de confidencialidade e segurança.</p>
+        <p>No caso de alterações societárias do Móbile Supermercados Digitais, seus dados serão transferidos, respeitando esta Declaração.</p>
+      </div>
+    </article>
+
+    <article id="secao-10" class="section-card">
+      <div class="section-header">
+        <div class="section-number">10</div>
+        <h2 class="section-title">Autoridades</h2>
+      </div>
+      <div class="section-body">
+        <p>Se necessário for, poderemos compartilhar suas informações com autoridades policiais ou judiciais, ou outros, decisão judicial, por cooperação de acordo com a lei, ou responder a processos judiciais ou disputas de qualquer tipo, inclusive quando considerarmos que há motivos suficientes de atividades suspeitas ou ilegal de um usuário, a fim de manter a integridade e a segurança independentemente de existir ou não requisição das autoridades.</p>
+      </div>
+    </article>
+
+    <article id="secao-11" class="section-card">
+      <div class="section-header">
+        <div class="section-number">11</div>
+        <h2 class="section-title">Como seus dados são protegidos? Pode haver mudanças nesta Declaração?</h2>
+      </div>
+      <div class="section-body">
+        <p>Várias são as medidas administrativas de segurança, como para proteção de dados pessoais contra acessos não autorizados implementando também técnicas de criptografia, monitoramento e testes de segurança, protegendo seus dados como um todo.</p>
+        <p>O Móbile Supermercados Digitais busca de tempos em tempos atualizar e melhorar cada vez mais essa Declaração de Privacidade. Sempre deixamos um aviso em nossa Plataforma na área de Configurações &gt; Declaração de Privacidade quando uma nova versão entrar em vigor.</p>
+      </div>
+    </article>
+
+    <article id="secao-12" class="highlight-contact">
+      <h2 class="highlight-contact-title">12. Como exercer seus direitos?</h2>
+      <p class="highlight-contact-desc">
+        Enquanto titular de dados pessoais, se você tiver alguma dúvida com relação a esta Declaração de Privacidade ou qualquer uma das práticas aqui descritas, entre em contato conosco através do nosso e-mail exclusivo:
+      </p>
+      <div>
+        <a href="mailto:privacidade@supermercadomobile.com.br" class="email-pill">
+          ✉ privacidade@supermercadomobile.com.br
+        </a>
+      </div>
+    </article>
+
+    <footer class="footer-note">
+      © 2026 Móbile Supermercados Digitais. Todos os direitos reservados.
+    </footer>
+  </main>
+</body>
+</html>

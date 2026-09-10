@@ -112,9 +112,9 @@ const EmailPasswordCard: React.FC<EmailPasswordCardProps> = ({
         />
         <span>
           Li e aceito os{" "}
-          <a href="#" style={{ color: "#193281" }}>Termos de Uso</a>
+          <a href="/termos-de-uso" style={{ color: "#193281" }} target="_blank" rel="noopener noreferrer">Termos de Uso</a>
           {" "}e a{" "}
-          <a href="https://www.mobilemercado.com.br/declaracao-de-privacidade" style={{ color: "#193281" }} target="_blank" rel="noopener noreferrer">Política de Privacidade</a>
+          <a href="/declaracao-de-privacidade" style={{ color: "#193281" }} target="_blank" rel="noopener noreferrer">Política de Privacidade</a>
         </span>
       </label>
 
