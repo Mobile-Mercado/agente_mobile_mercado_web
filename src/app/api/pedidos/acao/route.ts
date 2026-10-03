@@ -122,9 +122,9 @@ function getAgentCancelMetricRefs(
     metricRef: root
       .collection(AGENTE_CAPTURE_METRICS_COLLECTION)
       .doc(companyId),
+    establishmentRef: db.collection("estabelecimentos").doc(companyId),
     statsRefs: [
       db.collection("estabelecimentos").doc(companyId).collection("DailyStats").doc(dateId),
-      db.collection("estabelecimentos").doc(companyId).collection("MonthlyStats").doc(dateId),
       db.collection("estabelecimentos").doc(companyId).collection("Stats").doc("allTime"),
     ],
   };
@@ -134,6 +134,7 @@ function recordAgentCanceledOrder(
   transaction: FirebaseFirestore.Transaction,
   refs: NonNullable<ReturnType<typeof getAgentCancelMetricRefs>>,
   existing: FirebaseFirestore.DocumentSnapshot,
+  establishmentExists: boolean,
   now: FirebaseFirestore.FieldValue,
   pedidoId: string,
   userDocId: string,
@@ -163,6 +164,11 @@ function recordAgentCanceledOrder(
     atualizadoEm: now,
     pedidosCancelados: admin.firestore.FieldValue.increment(1),
   }, { merge: true });
+
+  if (!establishmentExists) {
+    console.warn("[pedidos/acao] Estabelecimento inexistente, stats nao gravados:", refs.companyId);
+    return;
+  }
 
   const statsUpdate = {
     estabelecimentoId: refs.companyId,
@@ -218,6 +224,9 @@ export async function POST(request: NextRequest) {
       const requestRef = pedidoRef.collection("solicitacoesCancelamento").doc();
       const agentCancelRefs = getAgentCancelMetricRefs(db, pedido, pedidoId);
       const agentCancelSnap = agentCancelRefs ? await transaction.get(agentCancelRefs.eventRef) : null;
+      const establishmentExists = agentCancelRefs
+        ? (await transaction.get(agentCancelRefs.establishmentRef)).exists
+        : false;
 
       if (isAutomaticCancelStatus(statusAtual)) {
         const novoStatus = "PurchaseStatus.canceled";
@@ -242,6 +251,7 @@ export async function POST(request: NextRequest) {
             transaction,
             agentCancelRefs,
             agentCancelSnap,
+            establishmentExists,
             now,
             pedidoId,
             userDocId,
@@ -285,6 +295,7 @@ export async function POST(request: NextRequest) {
             transaction,
             agentCancelRefs,
             agentCancelSnap,
+            establishmentExists,
             now,
             pedidoId,
             userDocId,

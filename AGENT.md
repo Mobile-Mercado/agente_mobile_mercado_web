@@ -121,7 +121,7 @@ Eventos sao registrados por `registrarCapturaDadosAgente` em `src/services/fires
 - Eventos individuais: `AgenteVendas/{companyId}/capturasDeDados`
 - Contadores por mercado: `AgenteVendas/{companyId}/metricasDeCapturas/resumo`
 - Notas e feedbacks: `AgenteVendas/{companyId}/notasEFeedbacks`
-- KPIs do gerenciador plus: `estabelecimentos/{companyId}/Stats/allTime`, `DailyStats/{dd-mm-aaaa}` e `MonthlyStats/{dd-mm-aaaa}`
+- KPIs do gerenciador plus: `estabelecimentos/{companyId}/Stats/allTime` e `DailyStats/{dd-mm-aaaa}` (gravados so se `estabelecimentos/{companyId}` existir)
 
 Eventos que tambem alimentam os KPIs do gerenciador plus:
 
