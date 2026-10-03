@@ -53,9 +53,15 @@ function getEstablishmentStatsRefs(
 ): FirebaseFirestore.DocumentReference[] {
   return [
     db.collection("estabelecimentos").doc(companyId).collection("DailyStats").doc(dateId),
-    db.collection("estabelecimentos").doc(companyId).collection("MonthlyStats").doc(dateId),
     db.collection("estabelecimentos").doc(companyId).collection("Stats").doc("allTime"),
   ];
+}
+
+function getEstablishmentRef(
+  db: FirebaseFirestore.Firestore,
+  companyId: string
+): FirebaseFirestore.DocumentReference {
+  return db.collection("estabelecimentos").doc(companyId);
 }
 
 function getAgentRoot(db: FirebaseFirestore.Firestore): FirebaseFirestore.DocumentReference {
@@ -117,10 +123,14 @@ export async function POST(request: NextRequest) {
       const statsRefs = statsCounterFields.length > 0
         ? getEstablishmentStatsRefs(db, event.companyId, dateId)
         : [];
+      const establishmentRef = getEstablishmentRef(db, event.companyId);
 
       await db.runTransaction(async (transaction) => {
         const existing = await transaction.get(eventRef);
         if (existing.exists) return;
+        const establishmentExists = statsRefs.length > 0
+          ? (await transaction.get(establishmentRef)).exists
+          : false;
 
         const now = admin.firestore.FieldValue.serverTimestamp();
         transaction.set(eventRef, {
@@ -139,7 +149,11 @@ export async function POST(request: NextRequest) {
           [CAPTURE_COUNTER_FIELD[event.eventType]]: admin.firestore.FieldValue.increment(1),
         }, { merge: true });
 
-        if (statsCounterFields.length > 0) {
+        if (statsRefs.length > 0 && !establishmentExists) {
+          console.warn("[capturas] Estabelecimento inexistente, stats nao gravados:", event.companyId);
+        }
+
+        if (statsRefs.length > 0 && establishmentExists) {
           const statsUpdate = statsCounterFields.reduce<Record<string, unknown>>((acc, field) => {
             acc[field] = admin.firestore.FieldValue.increment(1);
             return acc;
@@ -190,11 +204,13 @@ export async function POST(request: NextRequest) {
       const clientRef = agentRoot.collection(AGENTE_USERS_COLLECTION).doc(userId);
       const conversationRef = clientRef.collection("conversas").doc(conversationId);
       const statsRefs = getEstablishmentStatsRefs(db, companyId, dateId);
+      const establishmentRef = getEstablishmentRef(db, companyId);
 
       await db.runTransaction(async (transaction) => {
-        const refs = [eventRef, clientRef, conversationRef, ...statsRefs];
+        const refs = [eventRef, clientRef, conversationRef, establishmentRef, ...statsRefs];
         const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
         if (snapshots[0].exists) return;
+        const establishmentExists = snapshots[3].exists;
 
         const now = admin.firestore.Timestamp.now();
         const writeAverage = (
@@ -229,8 +245,12 @@ export async function POST(request: NextRequest) {
 
         writeAverage(clientRef, snapshots[1], { estabelecimentoId: companyId });
         writeAverage(conversationRef, snapshots[2], { companyId, userId });
+        if (!establishmentExists) {
+          console.warn("[capturas] Estabelecimento inexistente, stats nao gravados:", companyId);
+          return;
+        }
         statsRefs.forEach((ref, index) => {
-          writeAverage(ref, snapshots[index + 3], { estabelecimentoId: companyId, dateId });
+          writeAverage(ref, snapshots[index + 4], { estabelecimentoId: companyId, dateId });
         });
       });
 
